@@ -1,0 +1,24 @@
+[package]
+name = "crypt4ghfs"
+version = "0.1.0"
+authors = ["Roberto <roberto.ariosa@crg.eu>"]
+edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/EGA-archive/crypt4ghfs-rust"
+documentation = "https://docs.rs/crypt4ghfs"
+readme = "README.md"
+# TODO: Add missing categories
+
+[dependencies]
+pretty_env_logger = "0.4.0"
+fuse_mt = "0.5.1"
+clap = { version = "3.0.0-beta.2", features = ["yaml"] }
+serde = { version = "1.0.117", features = ["derive"] }
+log = "0.4.11"
+anyhow = "1.0.34"
+toml = "0.5.7"
+itertools = "0.9.0"
+rpassword = "5.0.0"
+crypt4gh = { git = "https://github.com/EGA-archive/crypt4gh-rust.git", branch = "main" }
+libc = "0.2.80"
+time = "0.1.44"

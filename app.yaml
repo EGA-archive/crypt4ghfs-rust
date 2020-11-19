@@ -1,0 +1,24 @@
+name: crypt4ghfs
+about: Fuse layer exposing Crypt4GH-encrypted files, as if they were decrypted.
+args:
+    - verbose:
+        required: false
+        short: v
+        long: verbose
+        about: Sets the level of verbosity
+        takes_value: false
+    - foreground:
+        required: false
+        short: f
+        long: foreground
+        #about:
+        takes_value: false
+    - conf:
+        required: false
+        long: conf
+        #about:
+        takes_value: true
+        value_name: conf_file
+        default_value: "~/.c4gh/fs.conf"
+    - MOUNTPOINT:
+        required: true
