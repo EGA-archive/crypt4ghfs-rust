@@ -94,7 +94,7 @@ impl Config {
 		default
 	}
 
-	pub fn get_extension(&self, default: String) -> Option<String> {
+	pub fn get_extension(&self) -> Option<String> {
 		self.default.extension.clone()
 	}
 

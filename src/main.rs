@@ -60,7 +60,7 @@ fn run() -> Result<()> {
 
 	// Get cache
 	let cache_directories = conf.get_cache(true);
-	let extension = conf.get_extension(".c4gh".into());
+	let extension = conf.get_extension();
 
 	let fs = fuse::filesystem::Crypt4ghFS::new(rootdir, seckey, recipients, extension, cache_directories);
 	fuse::run(fs, threads, mountpoint, foreground, options)?;
