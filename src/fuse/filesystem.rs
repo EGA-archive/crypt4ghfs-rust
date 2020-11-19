@@ -11,7 +11,7 @@ pub struct Crypt4ghFS {
 	rootdir: String,
 	keys: Vec<Keys>,
 	recipients: HashSet<Keys>,
-	extension: String,
+	extension: Option<String>,
 	cache_directories: bool,
 }
 
@@ -20,10 +20,10 @@ impl Crypt4ghFS {
 		rootdir: String,
 		seckey: Vec<u8>,
 		recipients: HashSet<Keys>,
-		extension: String,
+		extension: Option<String>,
 		cache_directories: bool,
 	) -> Self {
-		log::info!("Extension: {} ({})", extension, extension.len());
+		log::info!("Extension: {:?}", extension);
 		Self {
 			rootdir,
 			keys: vec![Keys {
@@ -469,11 +469,15 @@ impl FilesystemMT for Crypt4ghFS {
 	) -> fuse_mt::CallbackResult {
         log::debug!("read: {:?} {:#x} @ {:#x}", path, size, offset);
         
-        let mut file = File::open(self.real_path(path)).expect("Should be UnmanagedFile");
+        let real_path = self.real_path(path);
+        let file_path = Path::new(&real_path);
+        let mut file = File::open(file_path).unwrap();
         let mut data = Vec::new();
 
-        crypt4gh::decrypt(&self.keys, &mut file, &mut data, offset as usize, None, None)
-            .expect("read {:?}, {:#x} @ {:#x}: {} FAILED");
+        if self.extension.is_none() || (file_path.extension().is_some() && file_path.extension().unwrap() == self.extension.clone().unwrap().as_str()) {
+            crypt4gh::decrypt(&self.keys, &mut file, &mut data, offset as usize, None, None)
+                .expect("read {:?}, {:#x} @ {:#x}: {} FAILED");
+        }        
 
         log::info!("Data read successfully");
 
@@ -490,18 +494,20 @@ impl FilesystemMT for Crypt4ghFS {
 		_flags: u32,
 	) -> fuse_mt::ResultWrite {
         log::debug!("write: {:?} {:#x} @ {:#x}", path, data.len(), offset);
-        let mut file = OpenOptions::new().read(true).write(true).open(self.real_path(path)).expect("Should be UnmanagedFile");
+
+        let real_path = self.real_path(path);
+        let file_path = Path::new(&real_path);
+        let mut file = OpenOptions::new().read(true).write(true).open(self.real_path(file_path)).unwrap();
 
         if let Err(e) = file.seek(SeekFrom::Start(offset)) {
             log::error!("seek({:?}, {}): {}", path, offset, e);
             return Err(e.raw_os_error().unwrap());
         }
 
-        log::info!("Write data: {:?}", data);
-        log::info!("Recipients: {:?}", self.recipients);
-        crypt4gh::encrypt(&self.recipients, &mut data.as_slice(), &mut file, offset as usize, None)
-            .expect("write {:?}, {:#x} @ {:#x}: {} FAILED");
-        log::info!("Data written successfully");
+        if self.extension.is_none() || (file_path.extension().is_some() && file_path.extension().unwrap() == self.extension.clone().unwrap().as_str()) {
+            crypt4gh::encrypt(&self.recipients, &mut data.as_slice(), &mut file, 0, None)
+                .expect("write {:?}, {:#x} @ {:#x}: {} FAILED");
+        }
 
         Ok(data.len() as u32)
 	}
@@ -633,8 +639,8 @@ impl FilesystemMT for Crypt4ghFS {
 	}
 
 	fn statfs(&self, _req: fuse_mt::RequestInfo, path: &Path) -> fuse_mt::ResultStatfs {
-		log::debug!("statfs: {:?}", path);
-
+        log::debug!("statfs: {:?}", path);
+        
         let real = self.real_path(path);
         let mut buf: libc::statfs = unsafe { ::std::mem::zeroed() };
         let result = unsafe {

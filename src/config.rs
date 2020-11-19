@@ -94,8 +94,8 @@ impl Config {
 		default
 	}
 
-	pub fn get_extension(&self, default: String) -> String {
-		self.default.extension.clone().unwrap_or(default)
+	pub fn get_extension(&self, default: String) -> Option<String> {
+		self.default.extension.clone()
 	}
 
 	pub fn get_secret_key(&self) -> Result<Vec<u8>> {
