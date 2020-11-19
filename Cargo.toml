@@ -19,6 +19,6 @@ anyhow = "1.0.34"
 toml = "0.5.7"
 itertools = "0.9.0"
 rpassword = "5.0.0"
-crypt4gh = { git = "https://github.com/EGA-archive/crypt4gh-rust.git", branch = "main" }
+crypt4gh = "0.1.2"
 libc = "0.2.80"
 time = "0.1.44"
