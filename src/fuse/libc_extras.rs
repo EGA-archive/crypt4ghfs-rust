@@ -17,18 +17,18 @@ pub mod libc {
         #[cfg(target_os = "linux")]
         pub fn truncate64(path: *const c_char, size: off64_t) -> c_int;
 
-        // These XATTR functions are missing from the libc crate on Darwin for some reason.
-        #[cfg(target_os = "macos")]
-        pub fn listxattr(path: *const c_char, list: *mut c_char, size: size_t, options: c_int) -> ssize_t;
+        // // These XATTR functions are missing from the libc crate on Darwin for some reason.
+        // #[cfg(target_os = "macos")]
+        // pub fn listxattr(path: *const c_char, list: *mut c_char, size: size_t, options: c_int) -> ssize_t;
 
-        #[cfg(target_os = "macos")]
-        pub fn getxattr(path: *const c_char, name: *const c_char, value: *mut c_void, size: size_t, position: u32, options: c_int) -> ssize_t;
+        // #[cfg(target_os = "macos")]
+        // pub fn getxattr(path: *const c_char, name: *const c_char, value: *mut c_void, size: size_t, position: u32, options: c_int) -> ssize_t;
 
-        #[cfg(target_os = "macos")]
-        pub fn setxattr(path: *const c_char, name: *const c_char, value: *const c_void, size: size_t, flags: c_int, position: u32) -> c_int;
+        // #[cfg(target_os = "macos")]
+        // pub fn setxattr(path: *const c_char, name: *const c_char, value: *const c_void, size: size_t, flags: c_int, position: u32) -> c_int;
 
-        #[cfg(target_os = "macos")]
-        pub fn removexattr(path: *const c_char, name: *const c_char, flags: c_int) -> c_int;
+        // #[cfg(target_os = "macos")]
+        // pub fn removexattr(path: *const c_char, name: *const c_char, flags: c_int) -> c_int;
     }
 
     //
@@ -146,23 +146,23 @@ pub mod libc {
     #[cfg(target_os = "macos")]
     pub const XATTR_NOFOLLOW: c_int = 1;
 
-    #[cfg(target_os = "macos")]
-    pub unsafe fn llistxattr(path: *const c_char, namebuf: *mut c_char, size: size_t) -> ssize_t {
-        listxattr(path, namebuf, size, XATTR_NOFOLLOW)
-    }
+    // #[cfg(target_os = "macos")]
+    // pub unsafe fn llistxattr(path: *const c_char, namebuf: *mut c_char, size: size_t) -> ssize_t {
+    //     listxattr(path, namebuf, size, XATTR_NOFOLLOW)
+    // }
 
-    #[cfg(target_os = "macos")]
-    pub unsafe fn lgetxattr(path: *const c_char, name: *const c_char, value: *mut c_void, size: size_t) -> ssize_t {
-        getxattr(path, name, value, size, 0, XATTR_NOFOLLOW)
-    }
+    // #[cfg(target_os = "macos")]
+    // pub unsafe fn lgetxattr(path: *const c_char, name: *const c_char, value: *mut c_void, size: size_t) -> ssize_t {
+    //     getxattr(path, name, value, size, 0, XATTR_NOFOLLOW)
+    // }
 
-    #[cfg(target_os = "macos")]
-    pub unsafe fn lsetxattr(path: *const c_char, name: *const c_char, value: *const c_void, size: size_t, flags: c_int, position: u32) -> c_int {
-        setxattr(path, name, value, size, flags | XATTR_NOFOLLOW, position)
-    }
+    // #[cfg(target_os = "macos")]
+    // pub unsafe fn lsetxattr(path: *const c_char, name: *const c_char, value: *const c_void, size: size_t, flags: c_int, position: u32) -> c_int {
+    //     setxattr(path, name, value, size, flags | XATTR_NOFOLLOW, position)
+    // }
 
-    #[cfg(target_os = "macos")]
-    pub unsafe fn lremovexattr(path: *const c_char, name: *const c_char) -> c_int {
-        removexattr(path, name, XATTR_NOFOLLOW)
-    }
+    // #[cfg(target_os = "macos")]
+    // pub unsafe fn lremovexattr(path: *const c_char, name: *const c_char) -> c_int {
+    //     removexattr(path, name, XATTR_NOFOLLOW)
+    // }
 }

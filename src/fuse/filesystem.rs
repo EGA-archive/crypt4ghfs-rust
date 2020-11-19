@@ -297,34 +297,6 @@ impl FilesystemMT for Crypt4ghFS {
         }
 	}
 
-	fn mknod(
-		&self,
-		_req: fuse_mt::RequestInfo,
-		parent_path: &Path,
-		name: &OsStr,
-		mode: u32,
-		rdev: u32,
-	) -> fuse_mt::ResultEntry {
-		log::debug!("mknod: {:?}/{:?} (mode={:#o}, rdev={})", parent_path, name, mode, rdev);
-
-        let real = PathBuf::from(self.real_path(parent_path)).join(name);
-        let result = unsafe {
-            let path_c = CString::new(real.as_os_str().to_str().unwrap().as_bytes().to_vec()).unwrap();
-            libc::mknod(path_c.as_ptr(), mode as libc::mode_t, rdev as libc::dev_t)
-        };
-
-        if -1 == result {
-            let e = io::Error::last_os_error();
-            log::error!("mknod({:?}, {}, {}): {}", real, mode, rdev, e);
-            Err(e.raw_os_error().unwrap())
-        } else {
-            match libc_wrappers::lstat(real.into_os_string()) {
-                Ok(attr) => Ok((TTL, self.stat_to_fuse(attr))),
-                Err(e) => Err(e),   // if this happens, yikes
-            }
-        }
-	}
-
 	fn mkdir(&self, _req: fuse_mt::RequestInfo, parent_path: &Path, name: &OsStr, mode: u32) -> fuse_mt::ResultEntry {
 		log::debug!("mkdir {:?}/{:?} (mode={:#o})", parent_path, name, mode);
 
@@ -349,17 +321,6 @@ impl FilesystemMT for Crypt4ghFS {
         }
 	}
 
-	fn unlink(&self, _req: fuse_mt::RequestInfo, parent_path: &Path, name: &OsStr) -> fuse_mt::ResultEmpty {
-		log::debug!("unlink {:?}/{:?}", parent_path, name);
-
-        let real = PathBuf::from(self.real_path(parent_path)).join(name);
-        fs::remove_file(&real)
-            .map_err(|ioerr| {
-                log::error!("unlink({:?}): {}", real, ioerr);
-                ioerr.raw_os_error().unwrap()
-            })
-	}
-
 	fn rmdir(&self, _req: fuse_mt::RequestInfo, parent_path: &Path, name: &OsStr) -> fuse_mt::ResultEmpty {
 		log::debug!("rmdir: {:?}/{:?}", parent_path, name);
 
@@ -369,33 +330,6 @@ impl FilesystemMT for Crypt4ghFS {
                 log::error!("rmdir({:?}): {}", real, ioerr);
                 ioerr.raw_os_error().unwrap()
             })
-	}
-
-	fn symlink(
-		&self,
-		_req: fuse_mt::RequestInfo,
-		parent_path: &Path,
-		name: &OsStr,
-		target: &Path,
-	) -> fuse_mt::ResultEntry {
-		log::debug!("symlink: {:?}/{:?} -> {:?}", parent_path, name, target);
-
-        let real = PathBuf::from(self.real_path(parent_path)).join(name);
-        match ::std::os::unix::fs::symlink(target, &real) {
-            Ok(()) => {
-                match libc_wrappers::lstat(real.clone().into_os_string()) {
-                    Ok(attr) => Ok((TTL, self.stat_to_fuse(attr))),
-                    Err(e) => {
-                        log::error!("lstat after symlink({:?}, {:?}): {}", real, target, e);
-                        Err(e)
-                    },
-                }
-            },
-            Err(e) => {
-                log::error!("symlink({:?}, {:?}): {}", real, target, e);
-                Err(e.raw_os_error().unwrap())
-            }
-        }
 	}
 
 	fn rename(
@@ -415,34 +349,6 @@ impl FilesystemMT for Crypt4ghFS {
                 log::error!("rename({:?}, {:?}): {}", real, newreal, ioerr);
                 ioerr.raw_os_error().unwrap()
             })
-	}
-
-	fn link(
-		&self,
-		_req: fuse_mt::RequestInfo,
-		path: &Path,
-		newparent: &Path,
-		newname: &OsStr,
-	) -> fuse_mt::ResultEntry {
-		log::debug!("link: {:?} -> {:?}/{:?}", path, newparent, newname);
-
-        let real = self.real_path(path);
-        let newreal = PathBuf::from(self.real_path(newparent)).join(newname);
-        match fs::hard_link(&real, &newreal) {
-            Ok(()) => {
-                match libc_wrappers::lstat(real.clone()) {
-                    Ok(attr) => Ok((TTL, self.stat_to_fuse(attr))),
-                    Err(e) => {
-                        log::error!("lstat after link({:?}, {:?}): {}", real, newreal, e);
-                        Err(e)
-                    },
-                }
-            },
-            Err(e) => {
-                log::error!("link({:?}, {:?}): {}", real, newreal, e);
-                Err(e.raw_os_error().unwrap())
-            },
-        }
 	}
 
 	fn open(&self, _req: fuse_mt::RequestInfo, path: &Path, flags: u32) -> fuse_mt::ResultOpen {
@@ -696,52 +602,6 @@ impl FilesystemMT for Crypt4ghFS {
             }
         }
 	}
-
-    fn listxattr(&self, _req: RequestInfo, path: &Path, size: u32) -> ResultXattr {
-        log::debug!("listxattr: {:?}", path);
-
-        let real = self.real_path(path);
-
-        if size > 0 {
-            let mut data = Vec::<u8>::with_capacity(size as usize);
-            unsafe { data.set_len(size as usize) };
-            let nread = libc_wrappers::llistxattr(real, data.as_mut_slice())?;
-            data.truncate(nread);
-            Ok(Xattr::Data(data))
-        } else {
-            let nbytes = libc_wrappers::llistxattr(real, &mut[])?;
-            Ok(Xattr::Size(nbytes as u32))
-        }
-    }
-
-    fn getxattr(&self, _req: RequestInfo, path: &Path, name: &OsStr, size: u32) -> ResultXattr {
-        log::debug!("getxattr: {:?} {:?} {}", path, name, size);
-
-        let real = self.real_path(path);
-
-        if size > 0 {
-            let mut data = Vec::<u8>::with_capacity(size as usize);
-            unsafe { data.set_len(size as usize) };
-            let nread = libc_wrappers::lgetxattr(real, name.to_owned(), data.as_mut_slice())?;
-            data.truncate(nread);
-            Ok(Xattr::Data(data))
-        } else {
-            let nbytes = libc_wrappers::lgetxattr(real, name.to_owned(), &mut [])?;
-            Ok(Xattr::Size(nbytes as u32))
-        }
-    }
-
-    fn setxattr(&self, _req: RequestInfo, path: &Path, name: &OsStr, value: &[u8], flags: u32, position: u32) -> ResultEmpty {
-        log::debug!("setxattr: {:?} {:?} {} bytes, flags = {:#x}, pos = {}", path, name, value.len(), flags, position);
-        let real = self.real_path(path);
-        libc_wrappers::lsetxattr(real, name.to_owned(), value, flags, position)
-    }
-
-    fn removexattr(&self, _req: RequestInfo, path: &Path, name: &OsStr) -> ResultEmpty {
-        log::debug!("removexattr: {:?} {:?}", path, name);
-        let real = self.real_path(path);
-        libc_wrappers::lremovexattr(real, name.to_owned())
-    }
 
     #[cfg(target_os = "macos")]
 	fn setvolname(&self, _req: fuse_mt::RequestInfo, name: &OsStr) -> fuse_mt::ResultEmpty {

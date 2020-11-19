@@ -87,75 +87,75 @@ pub fn fstat(fd: u64) -> Result<libc::stat, libc::c_int> {
 	Ok(buf)
 }
 
-pub fn llistxattr(path: OsString, buf: &mut [u8]) -> Result<usize, libc::c_int> {
-    let path_c = into_cstring(path, "llistxattr");
+// pub fn llistxattr(path: OsString, buf: &mut [u8]) -> Result<usize, libc::c_int> {
+//     let path_c = into_cstring(path, "llistxattr");
 
-    let result = unsafe {
-        libc::llistxattr(path_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, buf.len())
-    };
-    match result {
-        -1 => Err(io::Error::last_os_error().raw_os_error().unwrap()),
-        nbytes => Ok(nbytes as usize),
-    }
-}
+//     let result = unsafe {
+//         libc::llistxattr(path_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_char, buf.len())
+//     };
+//     match result {
+//         -1 => Err(io::Error::last_os_error().raw_os_error().unwrap()),
+//         nbytes => Ok(nbytes as usize),
+//     }
+// }
 
-pub fn lgetxattr(path: OsString, name: OsString, buf: &mut [u8]) -> Result<usize, libc::c_int> {
-    let path_c = into_cstring(path, "lgetxattr");
-    let name_c = into_cstring(name, "lgetxattr");
+// pub fn lgetxattr(path: OsString, name: OsString, buf: &mut [u8]) -> Result<usize, libc::c_int> {
+//     let path_c = into_cstring(path, "lgetxattr");
+//     let name_c = into_cstring(name, "lgetxattr");
 
-    let result = unsafe {
-        libc::lgetxattr(path_c.as_ptr(), name_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_void,
-            buf.len())
-    };
-    match result {
-        -1 => Err(io::Error::last_os_error().raw_os_error().unwrap()),
-        nbytes => Ok(nbytes as usize),
-    }
-}
+//     let result = unsafe {
+//         libc::lgetxattr(path_c.as_ptr(), name_c.as_ptr(), buf.as_mut_ptr() as *mut libc::c_void,
+//             buf.len())
+//     };
+//     match result {
+//         -1 => Err(io::Error::last_os_error().raw_os_error().unwrap()),
+//         nbytes => Ok(nbytes as usize),
+//     }
+// }
 
-pub fn lsetxattr(path: OsString, name: OsString, value: &[u8], flags: u32, position: u32) -> Result<(), libc::c_int> {
-    let path_c = into_cstring(path, "lsetxattr");
-    let name_c = into_cstring(name, "lsetxattr");
+// pub fn lsetxattr(path: OsString, name: OsString, value: &[u8], flags: u32, position: u32) -> Result<(), libc::c_int> {
+//     let path_c = into_cstring(path, "lsetxattr");
+//     let name_c = into_cstring(name, "lsetxattr");
 
-    // MacOS obnoxiously has an non-standard parameter at the end of their lsetxattr
-    #[cfg(target_os = "macos")]
-    unsafe fn real(path: *const libc::c_char, name: *const libc::c_char,
-                   value: *const libc::c_void, size: libc::size_t, flags: libc::c_int,
-                   position: u32) -> libc::c_int {
-        libc::lsetxattr(path, name, value, size, flags, position)
-    }
+//     // MacOS obnoxiously has an non-standard parameter at the end of their lsetxattr
+//     #[cfg(target_os = "macos")]
+//     unsafe fn real(path: *const libc::c_char, name: *const libc::c_char,
+//                    value: *const libc::c_void, size: libc::size_t, flags: libc::c_int,
+//                    position: u32) -> libc::c_int {
+//         libc::lsetxattr(path, name, value, size, flags, position)
+//     }
 
-    #[cfg(not(target_os = "macos"))]
-    unsafe fn real(path: *const libc::c_char, name: *const libc::c_char,
-                   value: *const libc::c_void, size: libc::size_t, flags: libc::c_int,
-                   _position: u32) -> libc::c_int {
-        libc::lsetxattr(path, name, value, size, flags)
-    }
+//     #[cfg(not(target_os = "macos"))]
+//     unsafe fn real(path: *const libc::c_char, name: *const libc::c_char,
+//                    value: *const libc::c_void, size: libc::size_t, flags: libc::c_int,
+//                    _position: u32) -> libc::c_int {
+//         libc::lsetxattr(path, name, value, size, flags)
+//     }
 
-    if cfg!(not(target_os = "macos")) && position != 0 {
-        log::error!("lsetxattr: position != 0 is only supported on MacOS");
-        return Err(libc::EINVAL);
-    }
+//     if cfg!(not(target_os = "macos")) && position != 0 {
+//         log::error!("lsetxattr: position != 0 is only supported on MacOS");
+//         return Err(libc::EINVAL);
+//     }
 
-    let result = unsafe {
-        real(path_c.as_ptr(), name_c.as_ptr(), value.as_ptr() as *const libc::c_void,
-             value.len(), flags as libc::c_int, position)
-    };
+//     let result = unsafe {
+//         real(path_c.as_ptr(), name_c.as_ptr(), value.as_ptr() as *const libc::c_void,
+//              value.len(), flags as libc::c_int, position)
+//     };
 
-    if result == -1 {
-        Err(io::Error::last_os_error().raw_os_error().unwrap())
-    } else {
-        Ok(())
-    }
-}
+//     if result == -1 {
+//         Err(io::Error::last_os_error().raw_os_error().unwrap())
+//     } else {
+//         Ok(())
+//     }
+// }
 
-pub fn lremovexattr(path: OsString, name: OsString) -> Result<(), libc::c_int> {
-    let path_c = into_cstring(path, "lremovexattr");
-    let name_c = into_cstring(name, "lremovexattr");
+// pub fn lremovexattr(path: OsString, name: OsString) -> Result<(), libc::c_int> {
+//     let path_c = into_cstring(path, "lremovexattr");
+//     let name_c = into_cstring(name, "lremovexattr");
 
-    if -1 == unsafe { libc::lremovexattr(path_c.as_ptr(), name_c.as_ptr()) } {
-        Err(io::Error::last_os_error().raw_os_error().unwrap())
-    } else {
-        Ok(())
-    }
-}
+//     if -1 == unsafe { libc::lremovexattr(path_c.as_ptr(), name_c.as_ptr()) } {
+//         Err(io::Error::last_os_error().raw_os_error().unwrap())
+//     } else {
+//         Ok(())
+//     }
+// }
