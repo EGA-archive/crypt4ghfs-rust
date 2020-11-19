@@ -143,8 +143,8 @@ pub mod libc {
     #[cfg(target_os = "macos")]
     pub const AT_SYMLINK_NOFOLLOW: c_int = 0x400;
 
-    #[cfg(target_os = "macos")]
-    pub const XATTR_NOFOLLOW: c_int = 1;
+    // #[cfg(target_os = "macos")]
+    // pub const XATTR_NOFOLLOW: c_int = 1;
 
     // #[cfg(target_os = "macos")]
     // pub unsafe fn llistxattr(path: *const c_char, namebuf: *mut c_char, size: size_t) -> ssize_t {

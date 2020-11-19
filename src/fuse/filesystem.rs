@@ -1,7 +1,7 @@
 use super::libc_wrappers;
 use super::libc_extras::libc;
 use crypt4gh::Keys;
-use fuse_mt::{CreatedEntry, DirectoryEntry, FileAttr, FileType, FilesystemMT, RequestInfo, ResultEmpty, ResultXattr, Statfs, XTimes, Xattr};
+use fuse_mt::{CreatedEntry, DirectoryEntry, FileAttr, FileType, FilesystemMT, Statfs, XTimes};
 use std::{collections::HashSet, ffi::{CStr, CString, OsStr, OsString}, fs::{self, File, OpenOptions}, io::{self, Seek, SeekFrom, Write}, path::{Path, PathBuf}};
 use time::Timespec;
 
