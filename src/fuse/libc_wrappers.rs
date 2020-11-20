@@ -1,11 +1,11 @@
+use super::libc_extras::libc;
 use std::ffi::{CString, OsString};
 use std::io;
 use std::mem;
 use std::ptr;
-use super::libc_extras::libc;
 
 pub fn into_cstring(path: OsString, _syscall: &str) -> CString {
-    CString::new(path.into_string().unwrap().as_bytes()).unwrap()
+	CString::new(path.into_string().unwrap().as_bytes()).unwrap()
 }
 
 pub fn opendir(path: OsString) -> Result<u64, libc::c_int> {

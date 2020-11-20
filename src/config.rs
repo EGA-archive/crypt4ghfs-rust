@@ -4,7 +4,7 @@ use crypt4gh::{self, Keys};
 use itertools::Itertools;
 use rpassword::read_password_from_tty;
 use serde::{Deserialize, Serialize};
-use std::{ffi::OsString, fs::File, collections::HashSet, io::Read, path::Path};
+use std::{collections::HashSet, ffi::OsString, fs::File, io::Read, path::Path};
 use toml;
 
 const PASSPHRASE: &str = "C4GH_PASSPHRASE";
