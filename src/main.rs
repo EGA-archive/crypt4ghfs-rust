@@ -23,7 +23,7 @@ fn run() -> Result<()> {
 			std::env::set_var("RUST_LOG", "trace");
 		}
 		else {
-			std::env::set_var("RUST_LOG", "warn");
+			std::env::set_var("RUST_LOG", "info");
 		}
 	}
 
