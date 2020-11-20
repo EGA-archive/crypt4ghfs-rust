@@ -145,7 +145,6 @@ impl Config {
 
 		if self.crypt4gh.include_myself_as_recipient.unwrap_or(true) {
 			let k = crypt4gh::keys::get_public_key_from_private_key(seckey).unwrap();
-			log::info!("SECKEY ({}): {:?}", k.len(), k);
 			recipient_pubkeys.insert(Keys {
 				method: 0,
 				privkey: seckey.to_vec(),
