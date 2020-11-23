@@ -17,7 +17,7 @@ pub struct Crypt4ghFS {
 	rootdir: String,
 	keys: Vec<Keys>,
 	recipients: HashSet<Keys>,
-	extension: Option<String>,
+	extensions: Option<Vec<String>>,
 	cache_directories: bool,
 }
 
@@ -26,10 +26,10 @@ impl Crypt4ghFS {
 		rootdir: String,
 		seckey: Vec<u8>,
 		recipients: HashSet<Keys>,
-		extension: Option<String>,
+		extensions: Option<Vec<String>>,
 		cache_directories: bool,
 	) -> Self {
-		log::info!("Extension: {:?}", extension);
+		log::info!("Extension: {:?}", extensions);
 		Self {
 			rootdir,
 			keys: vec![Keys {
@@ -38,7 +38,7 @@ impl Crypt4ghFS {
 				recipient_pubkey: vec![],
 			}],
 			recipients,
-			extension,
+			extensions,
 			cache_directories,
 		}
 	}
@@ -121,7 +121,7 @@ impl Crypt4ghFS {
 
 	fn real_path(&self, partial: &Path) -> OsString {
 		PathBuf::from(&self.rootdir)
-			.join(partial.strip_prefix("/").unwrap())
+			.join(partial.strip_prefix("/").expect("Unable to strip the prefix"))
 			.into_os_string()
 	}
 
@@ -395,21 +395,36 @@ impl FilesystemMT for Crypt4ghFS {
 
 		let real_path = self.real_path(path);
 		let file_path = Path::new(&real_path);
-		let mut file = File::open(file_path).unwrap();
+		let mut file = File::open(file_path).expect("Read file not found");
 		let mut data = Vec::new();
 
-		if self.extension.is_none()
-			|| (file_path.extension().is_some()
-				&& file_path.extension().unwrap() == self.extension.clone().unwrap().as_str())
-		{
-			crypt4gh::decrypt(&self.keys, &mut file, &mut data, offset as usize, None, None)
-				.expect("read {:?}, {:#x} @ {:#x}: {} FAILED");
-		}
-		else {
-			file.seek(SeekFrom::Start(offset)).unwrap();
-			file.take(size as u64)
-				.read_to_end(&mut data)
-				.expect("Unable to read data");
+		// Decrypt or not based on the file extension
+		match &self.extensions {
+			Some(extensions) => {
+				// If some extensions are specified, decrypt only those
+				match file_path.extension() {
+					Some(file_extension) if extensions.contains(&file_extension.to_str().unwrap().to_string()) => {
+						// If the file_encryption is one of the specified
+						log::info!("Reading encrypted data");
+						crypt4gh::decrypt(&self.keys, &mut file, &mut data, offset as usize, None, None)
+							.expect("read {:?}, {:#x} @ {:#x}: {} FAILED");
+					},
+					_ => {
+						// If it is not (or does not have an extension)
+						log::info!("Reading raw data");
+						file.seek(SeekFrom::Start(offset)).unwrap();
+						file.take(size as u64)
+							.read_to_end(&mut data)
+							.expect("Unable to read data");
+					},
+				}
+			},
+			None => {
+				// If no extensions have been specified, decrypt all files
+				log::info!("Reading encrypted data");
+				crypt4gh::decrypt(&self.keys, &mut file, &mut data, offset as usize, None, None)
+					.expect("read {:?}, {:#x} @ {:#x}: {} FAILED");
+			},
 		}
 
 		log::info!("Data read successfully");
@@ -437,17 +452,30 @@ impl FilesystemMT for Crypt4ghFS {
 			return Err(e.raw_os_error().unwrap());
 		}
 
-		if self.extension.is_none()
-			|| (file_path.extension().is_some()
-				&& file_path.extension().unwrap() == self.extension.clone().unwrap().as_str())
-		{
-			log::info!("Writing data encrypted");
-			crypt4gh::encrypt(&self.recipients, &mut data.as_slice(), &mut file, 0, None)
-				.expect("write {:?}, {:#x} @ {:#x}: {} FAILED");
-		}
-		else {
-			log::info!("Writing data without encryption");
-			file.write_all(&data).expect("Unable to write data");
+		// Encrypt or not based on the file extension
+		match &self.extensions {
+			Some(extensions) => {
+				// If some extensions are specified, encrypt only those
+				match file_path.extension() {
+					Some(file_extension) if extensions.contains(&file_extension.to_str().unwrap().to_string()) => {
+						// If the file_encryption is one of the specified
+						log::info!("Writing data encrypted");
+						crypt4gh::encrypt(&self.recipients, &mut data.as_slice(), &mut file, 0, None)
+							.expect("write {:?}, {:#x} @ {:#x}: {} FAILED");
+					},
+					_ => {
+						// If it is not (or does not have an extension)
+						log::info!("Writing data without encryption");
+						file.write_all(&data).expect("Unable to write data");
+					},
+				}
+			},
+			None => {
+				// If no extensions have been specified, encrypt all files
+				log::info!("Writing data encrypted");
+				crypt4gh::encrypt(&self.recipients, &mut data.as_slice(), &mut file, 0, None)
+					.expect("write {:?}, {:#x} @ {:#x}: {} FAILED");
+			},
 		}
 
 		Ok(data.len() as u32)
