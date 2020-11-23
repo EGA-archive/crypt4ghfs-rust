@@ -1,6 +1,6 @@
 use anyhow::Result;
 use anyhow::{anyhow, ensure};
-use crypt4gh::{self, Keys};
+use crypt4gh::Keys;
 use itertools::Itertools;
 use rpassword::read_password_from_tty;
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use toml;
 
 const PASSPHRASE: &str = "C4GH_PASSPHRASE";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum LogLevel {
 	#[serde(alias = "CRITICAL")]
@@ -46,60 +46,122 @@ pub enum FuseMountOption {
 	Async,
 }
 
+impl FuseMountOption {
+	pub fn to_os_string(&self) -> OsString {
+		match self {
+			FuseMountOption::FSName(name) => OsString::from(&format!("fsname={}", name)),
+			FuseMountOption::Subtype(subtype) => OsString::from(&format!("subtype={}", subtype)),
+			FuseMountOption::Custom(value) => OsString::from(&value.clone()),
+			FuseMountOption::AllowOther => OsString::from("allow_other"),
+			FuseMountOption::AllowRoot => OsString::from("allow_root"),
+			FuseMountOption::AutoUnmount => OsString::from("auto_unmount"),
+			FuseMountOption::DefaultPermissions => OsString::from("default_permissions"),
+			FuseMountOption::Dev => OsString::from("dev"),
+			FuseMountOption::NoDev => OsString::from("nodev"),
+			FuseMountOption::Suid => OsString::from("suid"),
+			FuseMountOption::NoSuid => OsString::from("nosuid"),
+			FuseMountOption::Ro => OsString::from("ro"),
+			FuseMountOption::Rw => OsString::from("rw"),
+			FuseMountOption::Exec => OsString::from("exec"),
+			FuseMountOption::NoExec => OsString::from("noexec"),
+			FuseMountOption::Atime => OsString::from("atime"),
+			FuseMountOption::NoAtime => OsString::from("noatime"),
+			FuseMountOption::DirSync => OsString::from("dirsync"),
+			FuseMountOption::Sync => OsString::from("sync"),
+			FuseMountOption::Async => OsString::from("async"),
+		}
+	}
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Default {
-	pub rootdir: String,
-	pub log_level: Option<LogLevel>,
-	pub include_crypt4gh_log: Option<bool>,
-	pub extension: Option<String>,
+	rootdir: String,
+	log_level: Option<LogLevel>,
+	include_crypt4gh_log: Option<bool>,
+	extensions: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Fuse {
-	pub options: Option<Vec<FuseMountOption>>,
-	pub cache_directories: Option<bool>,
+	options: Option<Vec<FuseMountOption>>,
+	cache_directories: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Crypt4GH {
-	pub seckey: String,
-	pub recipient_keys: Option<Vec<String>>,
-	pub include_myself_as_recipient: Option<bool>,
+	#[serde(rename = "seckey")]
+	seckey_path: String,
+	recipient_keys: Option<Vec<String>>,
+	include_myself_as_recipient: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Config {
-	pub default: Default,
-	pub fuse: Option<Fuse>,
-	pub crypt4gh: Crypt4GH,
+	default: Default,
+	fuse: Option<Fuse>,
+	crypt4gh: Crypt4GH,
 }
 
 impl Config {
-	pub fn get_options(&self, default: Vec<FuseMountOption>) -> Vec<FuseMountOption> {
+	pub fn new_with_defaults(rootdir: String, seckey_path: String) -> Self {
+		Self {
+			default: Default {
+				rootdir,
+				log_level: Some(LogLevel::Info),
+				include_crypt4gh_log: Some(true),
+				extensions: None,
+			},
+			fuse: Some(Fuse {
+				options: Some(vec![
+					FuseMountOption::Ro,
+					FuseMountOption::DefaultPermissions,
+					FuseMountOption::AutoUnmount,
+				]),
+				cache_directories: Some(true),
+			}),
+			crypt4gh: Crypt4GH {
+				seckey_path,
+				recipient_keys: Some(vec![]),
+				include_myself_as_recipient: Some(true),
+			},
+		}
+	}
+
+	pub fn with_extensions(mut self, extensions: Vec<String>) -> Self {
+		self.default.extensions = Some(extensions);
+		self
+	}
+
+	pub fn with_log_level(mut self, log_level: LogLevel) -> Self {
+		self.default.log_level = Some(log_level);
+		self
+	}
+
+	pub fn get_options(&self) -> Vec<FuseMountOption> {
 		if let Some(fuse) = &self.fuse {
 			if let Some(options) = &fuse.options {
 				return options.to_vec();
 			}
 		}
-		default
+		vec![FuseMountOption::Ro, FuseMountOption::DefaultPermissions]
 	}
 
-	pub fn get_cache(&self, default: bool) -> bool {
+	pub fn get_cache(&self) -> bool {
 		if let Some(fuse) = &self.fuse {
 			if let Some(cache_directories) = fuse.cache_directories {
 				return cache_directories;
 			}
 		}
-		default
+		true
 	}
 
-	pub fn get_extension(&self) -> Option<String> {
-		self.default.extension.clone()
+	pub fn get_extensions(&self) -> Option<Vec<String>> {
+		self.default.extensions.clone()
 	}
 
 	pub fn get_secret_key(&self) -> Result<Vec<u8>> {
-		let seckey_path = Path::new(&self.crypt4gh.seckey);
+		let seckey_path = Path::new(&self.crypt4gh.seckey_path);
 		log::info!("Loading secret key from {}", seckey_path.display());
 		ensure!(seckey_path.is_file(), "Secret key not found");
 
@@ -128,7 +190,7 @@ impl Config {
 		let recipient_paths = &self.crypt4gh.recipient_keys.clone().unwrap_or(vec![]);
 
 		let mut recipient_pubkeys: HashSet<_> = recipient_paths
-			.iter()
+			.into_iter()
 			.map(Path::new)
 			.filter(|path| path.exists())
 			.filter_map(|path| {
@@ -154,38 +216,19 @@ impl Config {
 
 		recipient_pubkeys
 	}
-}
 
-impl FuseMountOption {
-	pub fn to_os_string(&self) -> OsString {
-		match self {
-			FuseMountOption::FSName(name) => OsString::from(&format!("fsname={}", name)),
-			FuseMountOption::Subtype(subtype) => OsString::from(&format!("subtype={}", subtype)),
-			FuseMountOption::Custom(value) => OsString::from(&value.clone()),
-			FuseMountOption::AllowOther => OsString::from("allow_other"),
-			FuseMountOption::AllowRoot => OsString::from("allow_root"),
-			FuseMountOption::AutoUnmount => OsString::from("auto_unmount"),
-			FuseMountOption::DefaultPermissions => OsString::from("default_permissions"),
-			FuseMountOption::Dev => OsString::from("dev"),
-			FuseMountOption::NoDev => OsString::from("nodev"),
-			FuseMountOption::Suid => OsString::from("suid"),
-			FuseMountOption::NoSuid => OsString::from("nosuid"),
-			FuseMountOption::Ro => OsString::from("ro"),
-			FuseMountOption::Rw => OsString::from("rw"),
-			FuseMountOption::Exec => OsString::from("exec"),
-			FuseMountOption::NoExec => OsString::from("noexec"),
-			FuseMountOption::Atime => OsString::from("atime"),
-			FuseMountOption::NoAtime => OsString::from("noatime"),
-			FuseMountOption::DirSync => OsString::from("dirsync"),
-			FuseMountOption::Sync => OsString::from("sync"),
-			FuseMountOption::Async => OsString::from("async"),
-		}
+	pub fn get_log_level(&self) -> LogLevel {
+		self.default.log_level.unwrap_or(LogLevel::Info)
 	}
-}
 
-pub fn parse_config(mut config_file: File) -> Result<Config> {
-	let mut config_string = String::new();
-	config_file.read_to_string(&mut config_string)?;
-	let config_toml = toml::from_str(config_string.as_str()).map_err(|e| anyhow!("Error reading config: {}", e));
-	config_toml
+	pub fn get_rootdir(&self) -> String {
+		self.default.rootdir.clone()
+	}
+
+	pub fn from_file(mut config_file: File) -> Result<Config> {
+		let mut config_string = String::new();
+		config_file.read_to_string(&mut config_string)?;
+		let config_toml = toml::from_str(config_string.as_str()).map_err(|e| anyhow!("Error reading config: {}", e));
+		config_toml
+	}
 }
