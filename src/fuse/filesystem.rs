@@ -1,7 +1,7 @@
 use super::libc_extras::libc;
 use super::libc_wrappers;
 use crypt4gh::Keys;
-use fuse_mt::{CreatedEntry, DirectoryEntry, FileAttr, FileType, FilesystemMT, Statfs, XTimes};
+use fuse_mt::{CreatedEntry, DirectoryEntry, FileAttr, FileType, FilesystemMT, Statfs};
 use std::{
 	collections::HashSet,
 	ffi::{CStr, CString, OsStr, OsString},
@@ -681,7 +681,7 @@ impl FilesystemMT for Crypt4ghFS {
 	#[cfg(target_os = "macos")]
 	fn getxtimes(&self, _req: fuse_mt::RequestInfo, path: &Path) -> fuse_mt::ResultXTimes {
 		log::debug!("getxtimes: {:?}", path);
-		let xtimes = XTimes {
+		let xtimes = fuse_mt::XTimes {
 			bkuptime: Timespec { sec: 0, nsec: 0 },
 			crtime: Timespec { sec: 0, nsec: 0 },
 		};
