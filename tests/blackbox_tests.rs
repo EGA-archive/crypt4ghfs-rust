@@ -9,6 +9,11 @@ fn test_mount_foreground() {
 	// Init
 	let init = Cleanup::new();
 
+	// Create mountpoint if it doesn't exist
+	if !Path::new("tests/mountpoint").is_dir() {
+		std::fs::create_dir("tests/mountpoint").expect("Unable to create tests/mountpoint");
+	}
+
 	// Create rootdir if it doesn't exist
 	if !Path::new("tests/rootdir").is_dir() {
 		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
@@ -39,6 +44,11 @@ fn test_mount_background() {
 	// Init
 	let init = Cleanup::new();
 
+	// Create mountpoint if it doesn't exist
+	if !Path::new("tests/mountpoint").is_dir() {
+		std::fs::create_dir("tests/mountpoint").expect("Unable to create tests/mountpoint");
+	}
+
 	// Create rootdir if it doesn't exist
 	if !Path::new("tests/rootdir").is_dir() {
 		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
@@ -68,6 +78,11 @@ fn test_mount_background() {
 fn test_extension_txt() {
 	// Init
 	let init = Cleanup::new();
+
+	// Create mountpoint if it doesn't exist
+	if !Path::new("tests/mountpoint").is_dir() {
+		std::fs::create_dir("tests/mountpoint").expect("Unable to create tests/mountpoint");
+	}
 
 	// Create rootdir if it doesn't exist
 	if !Path::new("tests/rootdir").is_dir() {
@@ -104,6 +119,11 @@ fn test_extension_txt() {
 fn test_extension_c4gh() {
 	// Init
 	let init = Cleanup::new();
+
+	// Create mountpoint if it doesn't exist
+	if !Path::new("tests/mountpoint").is_dir() {
+		std::fs::create_dir("tests/mountpoint").expect("Unable to create tests/mountpoint");
+	}
 
 	// Create rootdir if it doesn't exist
 	if !Path::new("tests/rootdir").is_dir() {
