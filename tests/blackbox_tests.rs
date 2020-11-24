@@ -1,5 +1,6 @@
 mod test_common;
 
+use std::path::Path;
 use crypt4ghfs::{config::*, run_with_config};
 pub use test_common::*;
 
@@ -7,6 +8,11 @@ pub use test_common::*;
 fn test_mount_foreground() {
 	// Init
 	let init = Cleanup::new();
+
+	// Create rootdir if it doesn't exist
+	if !Path::new("tests/rootdir").is_dir() {
+		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
+	}
 
 	// Check that path is unmounted
 	run("diskutil umount tests/mountpoint").unwrap();
@@ -33,6 +39,11 @@ fn test_mount_background() {
 	// Init
 	let init = Cleanup::new();
 
+	// Create rootdir if it doesn't exist
+	if !Path::new("tests/rootdir").is_dir() {
+		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
+	}
+
 	// Check that path is unmounted
 	run("diskutil umount tests/mountpoint").unwrap();
 
@@ -57,6 +68,11 @@ fn test_mount_background() {
 fn test_extension_txt() {
 	// Init
 	let init = Cleanup::new();
+
+	// Create rootdir if it doesn't exist
+	if !Path::new("tests/rootdir").is_dir() {
+		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
+	}
 
 	// Check that path is unmounted
 	run("diskutil umount tests/mountpoint").unwrap();
@@ -89,6 +105,11 @@ fn test_extension_c4gh() {
 	// Init
 	let init = Cleanup::new();
 
+	// Create rootdir if it doesn't exist
+	if !Path::new("tests/rootdir").is_dir() {
+		std::fs::create_dir("tests/rootdir").expect("Unable to create tests/mountpoint");
+	}
+
 	// Check that path is unmounted
 	run("diskutil umount tests/mountpoint").unwrap();
 
@@ -110,6 +131,30 @@ fn test_extension_c4gh() {
 	// Unmount
 	let (code, _, err) = run("diskutil umount tests/mountpoint").unwrap();
 	assert!(code == 0, err);
+
+	// Cleanup
+	drop(init);
+}
+
+#[test]
+fn test_wrong_rootdir() {
+
+	// Init
+	let init = Cleanup::new();
+
+	// Create rootdir if it doesn't exist
+	if Path::new("tests/rootdir").is_dir() {
+		std::fs::remove_dir_all("tests/rootdir").expect("Unable to remove directory rootdir");
+	}
+
+	// Custom config
+	let config = Config::new_with_defaults("tests/rootdir".into(), "tests/testfiles/bob.sec".into())
+		.with_log_level(LogLevel::Error)
+		.with_extensions(vec!["c4gh".into()]);
+
+	// Mount
+	let result = run_with_config(config, 1, "tests/mountpoint".into(), false);
+	assert!(result.unwrap_err().to_string().starts_with("Rootdir doesn't exist"));
 
 	// Cleanup
 	drop(init);

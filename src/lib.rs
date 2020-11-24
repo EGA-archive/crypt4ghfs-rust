@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use config::Config;
-use std::ffi::OsStr;
+use std::{ffi::OsStr, path::Path};
 
 pub mod config;
 mod fuse;
@@ -20,6 +20,7 @@ pub fn run_with_config(conf: Config, n_threads: usize, mountpoint: String, foreg
 	}
 
 	let rootdir = conf.get_rootdir();
+	ensure!(Path::new(&rootdir).exists(), "Rootdir doesn't exist (rootdir = {})", rootdir);
 
 	// Encryption / Decryption keys
 	let seckey = conf.get_secret_key()?;
