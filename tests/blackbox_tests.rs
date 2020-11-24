@@ -15,7 +15,7 @@ fn test_mount_foreground() {
 	}
 
 	// Check that path is unmounted
-	run("diskutil umount tests/mountpoint").unwrap();
+	run("umount tests/mountpoint").unwrap();
 
 	// Spawn mount
 	let mut child = spawn("cargo run -- -fv --conf tests/configs/fs.conf tests/mountpoint").unwrap();
@@ -24,7 +24,7 @@ fn test_mount_foreground() {
 	wait_with_timeout("mount | grep tests/mountpoint > /dev/null", 10_000, 100);
 
 	// Unmount
-	let (code, _, err) = run("diskutil umount tests/mountpoint").unwrap();
+	let (code, _, err) = run("umount tests/mountpoint").unwrap();
 	assert!(code == 0, err);
 
 	// Check termination
@@ -45,7 +45,7 @@ fn test_mount_background() {
 	}
 
 	// Check that path is unmounted
-	run("diskutil umount tests/mountpoint").unwrap();
+	run("umount tests/mountpoint").unwrap();
 
 	// Run daemon
 	let mut child = spawn("cargo run -- -v --conf tests/configs/fs.conf tests/mountpoint").unwrap();
@@ -57,7 +57,7 @@ fn test_mount_background() {
 	wait_with_timeout("mount | grep tests/mountpoint > /dev/null", 10_000, 100);
 
 	// Unmount
-	let (code, _, err) = run("diskutil umount tests/mountpoint").unwrap();
+	let (code, _, err) = run("umount tests/mountpoint").unwrap();
 	assert!(code == 0, err);
 
 	// Cleanup
@@ -75,7 +75,7 @@ fn test_extension_txt() {
 	}
 
 	// Check that path is unmounted
-	run("diskutil umount tests/mountpoint").unwrap();
+	run("umount tests/mountpoint").unwrap();
 
 	// Custom config
 	let config = Config::new_with_defaults("tests/rootdir".into(), "tests/testfiles/bob.sec".into())
@@ -93,7 +93,7 @@ fn test_extension_txt() {
 	count_characters("tests/mountpoint/file.txt", 6);
 
 	// Unmount
-	let (code, _, err) = run("diskutil umount tests/mountpoint").unwrap();
+	let (code, _, err) = run("umount tests/mountpoint").unwrap();
 	assert!(code == 0, err);
 
 	// Cleanup
@@ -111,7 +111,7 @@ fn test_extension_c4gh() {
 	}
 
 	// Check that path is unmounted
-	run("diskutil umount tests/mountpoint").unwrap();
+	run("umount tests/mountpoint").unwrap();
 
 	// Custom config
 	let config = Config::new_with_defaults("tests/rootdir".into(), "tests/testfiles/bob.sec".into())
@@ -129,7 +129,7 @@ fn test_extension_c4gh() {
 	count_characters("tests/mountpoint/file.c4gh", 158);
 
 	// Unmount
-	let (code, _, err) = run("diskutil umount tests/mountpoint").unwrap();
+	let (code, _, err) = run("umount tests/mountpoint").unwrap();
 	assert!(code == 0, err);
 
 	// Cleanup
