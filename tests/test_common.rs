@@ -164,10 +164,18 @@ impl CommandUnderTest {
 	}
 }
 
-pub struct Cleanup;
+pub struct Cleanup {
+	old_passphrase: Option<String>,
+}
 
 impl Drop for Cleanup {
 	fn drop(&mut self) {
+		
+		match self.old_passphrase.to_owned() {
+			Some(passphrase) => std::env::set_var("C4GH_PASSPHRASE", passphrase),
+			None => std::env::remove_var("C4GH_PASSPHRASE"),
+		}
+
 		eprintln!("DROP");
 		remove_file(TEMP_LOCATION);
 	}
@@ -183,7 +191,13 @@ impl Cleanup {
 			.unwrap()
 			.wait()
 			.unwrap();
-		Self {}
+		
+		let old_passphrase = std::env::var("C4GH_PASSPHRASE").ok();
+		std::env::set_var("C4GH_PASSPHRASE", "bob");
+		
+		Self {
+			old_passphrase,
+		}
 	}
 }
 
