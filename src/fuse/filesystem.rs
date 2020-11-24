@@ -275,6 +275,16 @@ impl FilesystemMT for Crypt4ghFS {
 		else {
 			let real = self.real_path(path);
 			let path_c = CString::new(real.to_str().unwrap()).unwrap();
+			#[cfg(not(target_os = "macos"))]
+			unsafe {
+				libc::utimensat(
+					libc::AT_FDCWD,
+					path_c.as_ptr(),
+					&times as *const libc::timespec,
+					libc::AT_SYMLINK_NOFOLLOW,
+				)
+			}
+			#[cfg(target_os = "macos")]
 			libc::utimensat(
 				libc::AT_FDCWD,
 				path_c.as_ptr(),
