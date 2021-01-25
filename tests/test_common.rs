@@ -170,7 +170,6 @@ pub struct Cleanup {
 
 impl Drop for Cleanup {
 	fn drop(&mut self) {
-		
 		match self.old_passphrase.to_owned() {
 			Some(passphrase) => std::env::set_var("C4GH_PASSPHRASE", passphrase),
 			None => std::env::remove_var("C4GH_PASSPHRASE"),
@@ -191,13 +190,11 @@ impl Cleanup {
 			.unwrap()
 			.wait()
 			.unwrap();
-		
+
 		let old_passphrase = std::env::var("C4GH_PASSPHRASE").ok();
 		std::env::set_var("C4GH_PASSPHRASE", "bob");
-		
-		Self {
-			old_passphrase,
-		}
+
+		Self { old_passphrase }
 	}
 }
 
@@ -276,7 +273,7 @@ pub fn echo(message: &str, filename: &str) {
 pub fn count_characters(filepath: &str, assert_size: usize) {
 	let (code, output, err) = run(format!("wc -c {} | awk '{{ print $1 }}'", filepath).as_str()).unwrap();
 	assert!(code == 0, "Unable to count characters (ERROR = {})", err);
-	assert_eq!(assert_size, output.trim().parse().unwrap(),);
+	assert_eq!(assert_size, output.trim().parse::<usize>().unwrap(),);
 }
 
 pub fn grep(filepath: &str, substring: &str) {

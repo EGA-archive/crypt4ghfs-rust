@@ -1,10 +1,9 @@
-use anyhow::Result;
 use clap::{crate_authors, crate_version, load_yaml, App, AppSettings};
-use crypt4ghfs::{config, run_with_config};
+use crypt4ghfs::{config, error::Crypt4GHFSError, run_with_config};
 use pretty_env_logger;
 use std::{env, fs::File};
 
-fn run() -> Result<()> {
+fn run() -> Result<(), Crypt4GHFSError> {
 	// Init CLI
 	let yaml = load_yaml!("../app.yaml");
 	let matches = App::from(yaml)

@@ -1,11 +1,17 @@
-use anyhow::{Result, ensure};
 use config::Config;
+use error::Crypt4GHFSError;
 use std::{ffi::OsStr, path::Path};
 
 pub mod config;
+pub mod error;
 mod fuse;
 
-pub fn run_with_config(conf: Config, n_threads: usize, mountpoint: String, foreground: bool) -> Result<()> {
+pub fn run_with_config(
+	conf: Config,
+	n_threads: usize,
+	mountpoint: String,
+	foreground: bool,
+) -> Result<(), Crypt4GHFSError> {
 	// Init logger
 	if std::env::var("RUST_LOG").is_err() {
 		let log_level = match conf.get_log_level() {
@@ -20,7 +26,9 @@ pub fn run_with_config(conf: Config, n_threads: usize, mountpoint: String, foreg
 	}
 
 	let rootdir = conf.get_rootdir();
-	ensure!(Path::new(&rootdir).exists(), "Rootdir doesn't exist (rootdir = {})", rootdir);
+	if !Path::new(&rootdir).exists() {
+		return Err(Crypt4GHFSError::PathDoesNotExist(Path::new(&rootdir).into()));
+	}
 
 	// Encryption / Decryption keys
 	let seckey = conf.get_secret_key()?;

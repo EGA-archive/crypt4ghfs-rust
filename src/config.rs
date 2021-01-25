@@ -1,5 +1,6 @@
+use crate::error::Crypt4GHFSError;
+use anyhow::anyhow;
 use anyhow::Result;
-use anyhow::{anyhow, ensure};
 use crypt4gh::Keys;
 use itertools::Itertools;
 use rpassword::read_password_from_tty;
@@ -160,10 +161,13 @@ impl Config {
 		self.default.extensions.clone()
 	}
 
-	pub fn get_secret_key(&self) -> Result<Vec<u8>> {
+	pub fn get_secret_key(&self) -> Result<Vec<u8>, Crypt4GHFSError> {
 		let seckey_path = Path::new(&self.crypt4gh.seckey_path);
 		log::info!("Loading secret key from {}", seckey_path.display());
-		ensure!(seckey_path.is_file(), "Secret key not found");
+
+		if !seckey_path.is_file() {
+			return Err(Crypt4GHFSError::SecretNotFound(seckey_path.into()));
+		}
 
 		let callback: Box<dyn Fn() -> Result<String>> = match std::env::var(PASSPHRASE) {
 			Ok(_) => {
@@ -184,6 +188,7 @@ impl Config {
 		};
 
 		crypt4gh::keys::get_private_key(seckey_path, callback)
+			.map_err(|e| Crypt4GHFSError::SecretKeyError(e.to_string()))
 	}
 
 	pub fn get_recipients(&self, seckey: &[u8]) -> HashSet<Keys> {
@@ -225,10 +230,12 @@ impl Config {
 		self.default.rootdir.clone()
 	}
 
-	pub fn from_file(mut config_file: File) -> Result<Config> {
+	pub fn from_file(mut config_file: File) -> Result<Config, Crypt4GHFSError> {
 		let mut config_string = String::new();
-		config_file.read_to_string(&mut config_string)?;
-		let config_toml = toml::from_str(config_string.as_str()).map_err(|e| anyhow!("Error reading config: {}", e));
+		config_file
+			.read_to_string(&mut config_string)
+			.map_err(|e| Crypt4GHFSError::BadConfig(e.to_string()))?;
+		let config_toml = toml::from_str(config_string.as_str()).map_err(|e| Crypt4GHFSError::BadConfig(e.to_string()));
 		config_toml
 	}
 }

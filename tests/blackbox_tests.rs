@@ -1,7 +1,7 @@
 mod test_common;
 
+use crypt4ghfs::{config::*, error::Crypt4GHFSError, run_with_config};
 use std::path::Path;
-use crypt4ghfs::{config::*, run_with_config};
 pub use test_common::*;
 
 #[test]
@@ -158,7 +158,6 @@ fn test_extension_c4gh() {
 
 #[test]
 fn test_wrong_rootdir() {
-
 	// Init
 	let init = Cleanup::new();
 
@@ -174,7 +173,10 @@ fn test_wrong_rootdir() {
 
 	// Mount
 	let result = run_with_config(config, 1, "tests/mountpoint".into(), false);
-	assert!(result.unwrap_err().to_string().starts_with("Rootdir doesn't exist"));
+	match result.unwrap_err() {
+		Crypt4GHFSError::PathDoesNotExist(_) => assert!(true),
+		_ => assert!(false),
+	}
 
 	// Cleanup
 	drop(init);
