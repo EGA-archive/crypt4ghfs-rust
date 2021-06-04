@@ -1,5 +1,5 @@
 [package]
-name = "inbox-fs"
+name = "crypt4ghfs"
 version = "0.2.0"
 authors = ["Roberto <roberto.ariosa@crg.eu>"]
 edition = "2018"
@@ -9,11 +9,11 @@ readme = "README.md"
 # TODO: Add missing categories
 
 [lib]
-name = "inbox_fs"
+name = "crypt4ghfs"
 path = "src/lib.rs"
 
 [[bin]]
-name = "inbox-fs"
+name = "crypt4ghfs"
 path = "src/main.rs"
 
 [dependencies]

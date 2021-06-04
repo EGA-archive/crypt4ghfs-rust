@@ -6,7 +6,7 @@
     clippy::module_name_repetitions,
     clippy::cast_sign_loss,
     clippy::cast_possible_truncation,
-    clippy::similar_names
+    clippy::similar_names,
 )]
 
 use config::Config;

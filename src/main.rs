@@ -1,5 +1,5 @@
 use clap::{crate_authors, crate_version, load_yaml, App, AppSettings};
-use inbox_fs::{config, error::Crypt4GHFSError, run_with_config};
+use crypt4ghfs::{config, error::Crypt4GHFSError, run_with_config};
 use std::os::unix::io::FromRawFd;
 use std::{env, fs::File};
 
