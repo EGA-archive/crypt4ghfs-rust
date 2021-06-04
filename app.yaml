@@ -7,18 +7,11 @@ args:
         long: verbose
         about: Sets the level of verbosity
         takes_value: false
-    - foreground:
-        required: false
-        short: f
-        long: foreground
-        #about:
-        takes_value: false
     - conf:
-        required: false
+        required: true
         long: conf
         #about:
         takes_value: true
-        value_name: conf_file
-        default_value: "~/.c4gh/fs.conf"
+        value_name: conf_fd
     - MOUNTPOINT:
         required: true
