@@ -1,11 +1,8 @@
 use crate::error::Crypt4GHFSError;
 use crate::error::Result;
-use crate::{checksum::Checksum, egafile::EgaFile, utils};
-use crate::{checksum::EncryptionType, inbox::InboxMessage};
+use crate::{egafile::EgaFile, utils};
 use chacha20poly1305_ietf::{Key, Nonce};
 use crypt4gh::{Keys, SEGMENT_SIZE};
-use crypto::digest::Digest;
-use crypto::{md5::Md5, sha2::Sha256};
 use itertools::Itertools;
 use sodiumoxide::{crypto::aead::chacha20poly1305_ietf, randombytes::randombytes};
 use std::os::unix::io::AsRawFd;
@@ -24,10 +21,6 @@ pub struct EncryptedFile {
     keys: Vec<Keys>,
     recipient_keys: HashSet<Keys>,
     write_buffer: Vec<u8>,
-    decrypted_checksum_md5: Md5,
-    decrypted_checksum_sha: Sha256,
-    encrypted_checksum_md5: Md5,
-    encrypted_checksum_sha: Sha256,
     only_read: bool,
 }
 
@@ -103,9 +96,6 @@ impl EgaFile for EncryptedFile {
     }
 
     fn write(&mut self, fh: u64, data: &[u8]) -> Result<usize> {
-        // Update decrypted checksum
-        self.decrypted_checksum_md5.input(data);
-        self.decrypted_checksum_sha.input(data);
 
         // Write header
         if self.only_read {
@@ -115,10 +105,6 @@ impl EgaFile for EncryptedFile {
                 crypt4gh::encrypt_header(&self.recipient_keys, &Some(self.session_key))
                     .map_err(|e| Crypt4GHFSError::Crypt4GHError(e.to_string()))?;
             log::debug!("Header size = {}", header_bytes.len());
-
-            // Update encrypted checksum
-            self.encrypted_checksum_md5.input(&header_bytes);
-            self.encrypted_checksum_sha.input(&header_bytes);
 
             // Write header
             let f = self
@@ -166,10 +152,6 @@ impl EgaFile for EncryptedFile {
                     .expect("Unable to create key from session_key");
                 let encrypted_segment = crypt4gh::encrypt_segment(&segment_slice, nonce, &key);
 
-                // Update encrypted checksums
-                self.encrypted_checksum_md5.input(&encrypted_segment);
-                self.encrypted_checksum_sha.input(&encrypted_segment);
-
                 // Write segment
                 f.write_all(&encrypted_segment)?;
             }
@@ -206,76 +188,11 @@ impl EgaFile for EncryptedFile {
         self.path = new_path.into();
     }
 
-    fn encrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        let md5 = self.decrypted_checksum_md5.result_str();
-        let sha = self.decrypted_checksum_sha.result_str();
-        self.decrypted_checksum_md5.reset();
-        self.decrypted_checksum_sha.reset();
-        Some(vec![
-            Checksum {
-                encryption_type: EncryptionType::Md5,
-                value: md5,
-            },
-            Checksum {
-                encryption_type: EncryptionType::Sha256,
-                value: sha,
-            },
-        ])
-    }
-
-    fn decrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        let md5 = self.encrypted_checksum_md5.result_str();
-        let sha = self.encrypted_checksum_sha.result_str();
-        self.encrypted_checksum_md5.reset();
-        self.encrypted_checksum_sha.reset();
-        Some(vec![
-            Checksum {
-                encryption_type: EncryptionType::Md5,
-                value: md5,
-            },
-            Checksum {
-                encryption_type: EncryptionType::Sha256,
-                value: sha,
-            },
-        ])
-    }
-
     fn attrs(&self, uid: u32, gid: u32) -> Result<fuser::FileAttr> {
         let mut path_str = self.path.display().to_string();
         path_str.push_str(".c4gh");
         let stat = utils::lstat(Path::new(&path_str))?;
         Ok(utils::stat_to_fileatr(stat, uid, gid))
-    }
-
-    fn upload_message(&mut self, username: &str, fh: u64) -> Result<InboxMessage> {
-        let metadata = self
-            .opened_files
-            .get(&fh)
-            .ok_or(Crypt4GHFSError::FileNotOpened)?
-            .metadata()?;
-        let filesize = metadata.len();
-        let file_last_modified = metadata.modified()?;
-        Ok(InboxMessage::new_upload(
-            username.into(),
-            &self.path(),
-            filesize,
-            false,
-            file_last_modified,
-            self.decrypted_checksum(),
-            self.encrypted_checksum(),
-        ))
-    }
-
-    fn rename_message(&mut self, username: &str, old_path: &Path) -> InboxMessage {
-        InboxMessage::new_rename(username.into(), &self.path(), old_path)
-    }
-
-    fn remove_message(&mut self, username: &str) -> InboxMessage {
-        InboxMessage::new_remove(username.into(), &self.path())
-    }
-
-    fn needs_upload(&self) -> bool {
-        !self.only_read
     }
 }
 
@@ -303,10 +220,6 @@ impl EncryptedFile {
             keys: keys.to_vec(),
             recipient_keys: recipient_keys.clone(),
             write_buffer: Vec::new(),
-            decrypted_checksum_md5: Md5::new(),
-            decrypted_checksum_sha: Sha256::new(),
-            encrypted_checksum_md5: Md5::new(),
-            encrypted_checksum_sha: Sha256::new(),
             only_read: true,
         }
     }

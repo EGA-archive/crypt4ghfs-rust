@@ -1,4 +1,4 @@
-use crate::{checksum::Checksum, error::Result, inbox::InboxMessage};
+use crate::{error::Result};
 use fuser::FileAttr;
 use std::path::Path;
 
@@ -16,14 +16,4 @@ pub trait EgaFile {
     fn close(&mut self, fh: u64) -> Result<()>;
     fn rename(&mut self, new_path: &Path);
     fn attrs(&self, uid: u32, gid: u32) -> Result<FileAttr>;
-
-    // Checksums
-    fn encrypted_checksum(&mut self) -> Option<Vec<Checksum>>;
-    fn decrypted_checksum(&mut self) -> Option<Vec<Checksum>>;
-
-    // Messages
-    fn upload_message(&mut self, username: &str, fh: u64) -> Result<InboxMessage>;
-    fn rename_message(&mut self, username: &str, old_path: &Path) -> InboxMessage;
-    fn remove_message(&mut self, username: &str) -> InboxMessage;
-    fn needs_upload(&self) -> bool;
 }

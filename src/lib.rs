@@ -13,7 +13,6 @@ use config::Config;
 use error::Crypt4GHFSError;
 use std::{ffi::OsStr, path::Path};
 
-mod checksum;
 pub mod config;
 mod directory;
 mod egafile;
@@ -21,7 +20,6 @@ mod encrypted_file;
 pub mod error;
 mod file_admin;
 mod filesystem;
-mod inbox;
 mod regular_file;
 mod utils;
 
@@ -55,7 +53,7 @@ pub fn run_with_config(conf: &Config, mountpoint: &str) -> Result<(), Crypt4GHFS
 
     let options = options.iter().map(|os| OsStr::new(os)).collect::<Vec<_>>();
 
-    let mountpoint = mountpoint.replace("<username>", &conf.get_username());
+    let mountpoint = mountpoint;
 
     let fs = filesystem::Crypt4ghFS::new(
         &rootdir,

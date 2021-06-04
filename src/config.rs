@@ -283,14 +283,7 @@ impl Config {
     }
 
     pub fn get_rootdir(&self) -> String {
-        self.fuse
-            .rootdir
-            .replace("{username}", &self.get_username())
-    }
-
-    #[allow(clippy::unused_self)]
-    pub fn get_username(&self) -> String {
-        whoami::username()
+        self.fuse.rootdir.to_string()
     }
 
     pub fn from_file(mut config_file: File) -> Result<Self, Crypt4GHFSError> {

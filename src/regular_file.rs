@@ -1,11 +1,8 @@
 use crate::{
-    checksum::Checksum,
     egafile::EgaFile,
     error::{Crypt4GHFSError, Result},
     utils,
 };
-use crate::{checksum::EncryptionType, inbox::InboxMessage};
-use crypto::{digest::Digest, md5::Md5, sha2::Sha256};
 use std::io::SeekFrom;
 use std::io::Write;
 use std::os::unix::io::AsRawFd;
@@ -15,8 +12,6 @@ use std::{fs::File, io::Read, path::Path};
 pub struct RegularFile {
     pub opened_files: HashMap<u64, Box<File>>,
     pub path: Box<Path>,
-    pub decrypted_checksum_md5: Md5,
-    pub decrypted_checksum_sha: Sha256,
     pub only_read: bool,
 }
 
@@ -64,10 +59,6 @@ impl EgaFile for RegularFile {
             .get_mut(&fh)
             .ok_or(Crypt4GHFSError::FileNotOpened)?;
 
-        // Update checksums
-        self.decrypted_checksum_md5.input(data);
-        self.decrypted_checksum_sha.input(data);
-
         // Write data
         f.write_all(data)?;
         Ok(data.len())
@@ -97,61 +88,9 @@ impl EgaFile for RegularFile {
         self.path = new_path.into();
     }
 
-    fn encrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        let md5 = self.decrypted_checksum_md5.result_str();
-        let sha = self.decrypted_checksum_sha.result_str();
-        self.decrypted_checksum_md5.reset();
-        self.decrypted_checksum_sha.reset();
-        Some(vec![
-            Checksum {
-                encryption_type: EncryptionType::Md5,
-                value: md5,
-            },
-            Checksum {
-                encryption_type: EncryptionType::Sha256,
-                value: sha,
-            },
-        ])
-    }
-
-    fn decrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        None
-    }
-
     fn attrs(&self, uid: u32, gid: u32) -> Result<fuser::FileAttr> {
         let stat = utils::lstat(&self.path)?;
         Ok(utils::stat_to_fileatr(stat, uid, gid))
-    }
-
-    fn upload_message(&mut self, username: &str, fh: u64) -> Result<InboxMessage> {
-        let metadata = self
-            .opened_files
-            .get(&fh)
-            .ok_or(Crypt4GHFSError::FileNotOpened)?
-            .metadata()?;
-        let filesize = metadata.len();
-        let file_last_modified = metadata.modified()?;
-        Ok(InboxMessage::new_upload(
-            username.into(),
-            &self.path(),
-            filesize,
-            false,
-            file_last_modified,
-            self.decrypted_checksum(),
-            self.encrypted_checksum(),
-        ))
-    }
-
-    fn rename_message(&mut self, username: &str, old_path: &Path) -> InboxMessage {
-        InboxMessage::new_rename(username.into(), &self.path(), old_path)
-    }
-
-    fn remove_message(&mut self, username: &str) -> InboxMessage {
-        InboxMessage::new_remove(username.into(), &self.path())
-    }
-
-    fn needs_upload(&self) -> bool {
-        !self.only_read
     }
 }
 
@@ -167,8 +106,6 @@ impl RegularFile {
         Self {
             opened_files,
             path,
-            decrypted_checksum_md5: Md5::new(),
-            decrypted_checksum_sha: Sha256::new(),
             only_read: true,
         }
     }

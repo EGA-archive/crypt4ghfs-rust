@@ -1,6 +1,5 @@
 use clap::{crate_authors, crate_version, load_yaml, App, AppSettings};
 use crypt4ghfs::{config, error::Crypt4GHFSError, run_with_config};
-use std::os::unix::io::FromRawFd;
 use std::{env, fs::File};
 
 fn run() -> Result<(), Crypt4GHFSError> {
@@ -17,13 +16,10 @@ fn run() -> Result<(), Crypt4GHFSError> {
     let mountpoint: String = matches.value_of_t("MOUNTPOINT")?;
 
     // Read config
-    let config_file = if matches.is_present("test") {
-        File::open("tests/configs/fs.conf")?
-    } else {
-        let config_fh: i32 = matches.value_of_t("conf")?;
-        log::info!("Loading config: {}", config_fh);
-        unsafe { File::from_raw_fd(config_fh) }
-    };
+    let config_path: String = matches.value_of_t("conf")?;
+    log::info!("Loading config: {}", config_path);
+    let config_file = File::open(config_path)?;
+    
     let conf = config::Config::from_file(config_file)?;
     log::debug!("Config = {:?}", conf);
 

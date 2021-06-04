@@ -10,8 +10,8 @@ args:
     - conf:
         required: true
         long: conf
-        #about:
+        #about: TODO
         takes_value: true
-        value_name: conf_fd
+        value_name: conf_path
     - MOUNTPOINT:
         required: true

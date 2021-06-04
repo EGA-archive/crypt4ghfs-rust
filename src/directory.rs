@@ -1,6 +1,6 @@
 use crate::error::Crypt4GHFSError;
 use crate::error::Result;
-use crate::{checksum::Checksum, egafile::EgaFile, inbox::InboxMessage, utils};
+use crate::{egafile::EgaFile, utils};
 use std::{collections::HashMap, os::unix::io::AsRawFd};
 use std::{fs::File, path::Path};
 
@@ -56,48 +56,9 @@ impl EgaFile for Directory {
         self.path = new_path.into();
     }
 
-    fn encrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        unimplemented!()
-    }
-
-    fn decrypted_checksum(&mut self) -> Option<Vec<Checksum>> {
-        unimplemented!()
-    }
-
     fn attrs(&self, uid: u32, gid: u32) -> Result<fuser::FileAttr> {
         let stat = utils::lstat(&self.path)?;
         Ok(utils::stat_to_fileatr(stat, uid, gid))
-    }
-
-    fn upload_message(&mut self, username: &str, fh: u64) -> Result<InboxMessage> {
-        let metadata = self
-            .opened_files
-            .get(&fh)
-            .ok_or(Crypt4GHFSError::FileNotOpened)?
-            .metadata()?;
-        let filesize = metadata.len();
-        let file_last_modified = metadata.modified()?;
-        Ok(InboxMessage::new_upload(
-            username.into(),
-            &self.path(),
-            filesize,
-            false,
-            file_last_modified,
-            self.decrypted_checksum(),
-            self.encrypted_checksum(),
-        ))
-    }
-
-    fn rename_message(&mut self, username: &str, old_path: &Path) -> InboxMessage {
-        InboxMessage::new_rename(username.into(), &self.path(), old_path)
-    }
-
-    fn remove_message(&mut self, username: &str) -> InboxMessage {
-        InboxMessage::new_remove(username.into(), &self.path())
-    }
-
-    fn needs_upload(&self) -> bool {
-        false
     }
 }
 
