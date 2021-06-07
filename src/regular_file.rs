@@ -1,13 +1,12 @@
-use crate::{
-    egafile::EgaFile,
-    error::{Crypt4GHFSError, Result},
-    utils,
-};
-use std::io::SeekFrom;
-use std::io::Write;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
-use std::{collections::HashMap, io::Seek};
-use std::{fs::File, io::Read, path::Path};
+use std::path::Path;
+
+use crate::egafile::EgaFile;
+use crate::error::{Crypt4GHFSError, Result};
+use crate::utils;
 
 pub struct RegularFile {
     pub opened_files: HashMap<u64, Box<File>>,

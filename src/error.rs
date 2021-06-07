@@ -1,5 +1,7 @@
+use std::io;
+use std::path::Path;
+
 use nix::errno::Errno;
-use std::{io, path::Path};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Crypt4GHFSError>;

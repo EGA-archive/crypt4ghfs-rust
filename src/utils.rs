@@ -1,25 +1,21 @@
-use crate::error::Result;
-use crate::{
-    directory::Directory, egafile::EgaFile, encrypted_file::EncryptedFile,
-    regular_file::RegularFile,
-};
+use std::collections::HashSet;
+use std::fs::{DirEntry, File, OpenOptions};
+use std::io;
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
+use std::time::{Duration, SystemTime};
+
 use crypt4gh::Keys;
 use fuser::{FileAttr, FileType};
-use nix::{
-    fcntl::OFlag,
-    sys::{
-        stat::{FileStat, Mode, SFlag},
-        statvfs::Statvfs,
-    },
-};
-use std::os::unix::fs::OpenOptionsExt;
-use std::{
-    collections::HashSet,
-    fs::{DirEntry, File, OpenOptions},
-    io,
-    path::Path,
-    time::{Duration, SystemTime},
-};
+use nix::fcntl::OFlag;
+use nix::sys::stat::{FileStat, Mode, SFlag};
+use nix::sys::statvfs::Statvfs;
+
+use crate::directory::Directory;
+use crate::egafile::EgaFile;
+use crate::encrypted_file::EncryptedFile;
+use crate::error::Result;
+use crate::regular_file::RegularFile;
 
 pub fn lstat(path: &Path) -> Result<FileStat> {
     let stat = nix::sys::stat::lstat(path)?;
@@ -58,6 +54,9 @@ pub fn stat_to_fileatr(stat: FileStat, uid: u32, gid: u32) -> FileAttr {
         crtime: SystemTime::UNIX_EPOCH, // TODO: Is this one okay?
         kind,
         perm: perm.bits() as u16,
+        #[cfg(target_os = "macos")]
+        nlink: u32::from(stat.st_nlink),
+        #[cfg(target_os = "linux")]
         nlink: stat.st_nlink as u32,
         uid,
         gid,
@@ -72,11 +71,14 @@ pub fn get_type(entry: &DirEntry) -> fuser::FileType {
     let kind = entry.file_type().expect("Unable to get file type");
     if kind.is_file() {
         fuser::FileType::RegularFile
-    } else if kind.is_dir() {
+    }
+    else if kind.is_dir() {
         fuser::FileType::Directory
-    } else if kind.is_symlink() {
+    }
+    else if kind.is_symlink() {
         fuser::FileType::Symlink
-    } else {
+    }
+    else {
         panic!("Unknown file type");
     }
 }
@@ -136,16 +138,18 @@ fn wrapper(
                 keys,
                 recipient_keys,
             ))
-        }
+        },
         None => {
             if path.is_file() {
                 Box::new(EncryptedFile::new(file, path, keys, recipient_keys))
-            } else if path.is_dir() {
+            }
+            else if path.is_dir() {
                 Box::new(Directory::new(file, path))
-            } else {
+            }
+            else {
                 panic!("Unknown file: {:?}", path)
             }
-        }
+        },
     }
 }
 

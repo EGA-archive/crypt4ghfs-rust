@@ -1,5 +1,8 @@
-use crate::{directory::Directory, egafile::EgaFile};
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use crate::directory::Directory;
+use crate::egafile::EgaFile;
 
 type Inode = u64;
 

@@ -6,12 +6,14 @@
     clippy::module_name_repetitions,
     clippy::cast_sign_loss,
     clippy::cast_possible_truncation,
-    clippy::similar_names,
+    clippy::similar_names
 )]
+
+use std::ffi::OsStr;
+use std::path::Path;
 
 use config::Config;
 use error::Crypt4GHFSError;
-use std::{ffi::OsStr, path::Path};
 
 pub mod config;
 mod directory;
@@ -37,7 +39,8 @@ pub fn run_with_config(conf: &Config, mountpoint: &str) -> Result<(), Crypt4GHFS
     // Encryption / Decryption keys
     let seckey = if let Some(key) = conf.get_secret_key()? {
         key
-    } else {
+    }
+    else {
         log::warn!("No seckey specified");
         vec![0_u8; 32]
     };

@@ -1,18 +1,18 @@
-use crate::error::Crypt4GHFSError;
-use crate::error::Result;
-use crate::{egafile::EgaFile, utils};
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::io::AsRawFd;
+use std::path::Path;
+
 use chacha20poly1305_ietf::{Key, Nonce};
 use crypt4gh::{Keys, SEGMENT_SIZE};
 use itertools::Itertools;
-use sodiumoxide::{crypto::aead::chacha20poly1305_ietf, randombytes::randombytes};
-use std::os::unix::io::AsRawFd;
-use std::{collections::HashMap, io::Read};
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{Seek, SeekFrom, Write},
-    path::Path,
-};
+use sodiumoxide::crypto::aead::chacha20poly1305_ietf;
+use sodiumoxide::randombytes::randombytes;
+
+use crate::egafile::EgaFile;
+use crate::error::{Crypt4GHFSError, Result};
+use crate::utils;
 
 pub struct EncryptedFile {
     opened_files: HashMap<u64, Box<File>>,
@@ -35,8 +35,8 @@ impl EgaFile for EncryptedFile {
 
     fn open(&mut self, flags: i32) -> Result<i32> {
         let mut path_str = self.path().to_string_lossy().to_string();
-		path_str.push_str(".c4gh");
-		let path = Path::new(&path_str);
+        path_str.push_str(".c4gh");
+        let path = Path::new(&path_str);
         let file = utils::open(path, flags)?;
         let fh = file.as_raw_fd();
         self.opened_files.insert(fh as u64, Box::new(file));
@@ -96,7 +96,6 @@ impl EgaFile for EncryptedFile {
     }
 
     fn write(&mut self, fh: u64, data: &[u8]) -> Result<usize> {
-
         // Write header
         if self.only_read {
             // Build header
@@ -137,7 +136,8 @@ impl EgaFile for EncryptedFile {
             if segment_slice.len() < SEGMENT_SIZE {
                 log::info!("Storing PARTIAL segment");
                 new_last_segment = segment_slice;
-            } else {
+            }
+            else {
                 log::info!("Writing FULL segment");
                 // Full segment, write to the file
                 let f = self

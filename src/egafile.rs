@@ -1,6 +1,8 @@
-use crate::{error::Result};
-use fuser::FileAttr;
 use std::path::Path;
+
+use fuser::FileAttr;
+
+use crate::error::Result;
 
 pub trait EgaFile {
     // Attributes

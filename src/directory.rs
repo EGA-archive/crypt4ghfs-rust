@@ -1,8 +1,11 @@
-use crate::error::Crypt4GHFSError;
-use crate::error::Result;
-use crate::{egafile::EgaFile, utils};
-use std::{collections::HashMap, os::unix::io::AsRawFd};
-use std::{fs::File, path::Path};
+use std::collections::HashMap;
+use std::fs::File;
+use std::os::unix::io::AsRawFd;
+use std::path::Path;
+
+use crate::egafile::EgaFile;
+use crate::error::{Crypt4GHFSError, Result};
+use crate::utils;
 
 pub struct Directory {
     pub opened_files: HashMap<u64, Box<File>>,

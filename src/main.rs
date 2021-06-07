@@ -1,6 +1,9 @@
+use std::env;
+use std::fs::File;
+
 use clap::{crate_authors, crate_version, load_yaml, App, AppSettings};
-use crypt4ghfs::{config, error::Crypt4GHFSError, run_with_config};
-use std::{env, fs::File};
+use crypt4ghfs::error::Crypt4GHFSError;
+use crypt4ghfs::{config, run_with_config};
 
 fn run() -> Result<(), Crypt4GHFSError> {
     // Init CLI
@@ -19,7 +22,7 @@ fn run() -> Result<(), Crypt4GHFSError> {
     let config_path: String = matches.value_of_t("conf")?;
     log::info!("Loading config: {}", config_path);
     let config_file = File::open(config_path)?;
-    
+
     let conf = config::Config::from_file(config_file)?;
     log::debug!("Config = {:?}", conf);
 

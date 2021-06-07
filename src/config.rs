@@ -1,18 +1,17 @@
-use crate::error::Crypt4GHFSError;
-use anyhow::anyhow;
-use anyhow::Result;
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
+use std::ffi::OsString;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
+use anyhow::{anyhow, Result};
 use crypt4gh::Keys;
 use itertools::Itertools;
 use rpassword::read_password_from_tty;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    ffi::OsString,
-    fs::File,
-    io::Read,
-    path::Path,
-};
+
+use crate::error::Crypt4GHFSError;
 
 const PASSPHRASE: &str = "C4GH_PASSPHRASE";
 
@@ -223,12 +222,13 @@ impl Config {
                         Box::new(|| {
                             std::env::var(PASSPHRASE).map_err(|e| {
                                 anyhow!(
-									"Unable to get the passphrase from the env variable C4GH_PASSPHRASE ({})",
-									e
-								)
+                                    "Unable to get the passphrase from the env variable \
+                                     C4GH_PASSPHRASE ({})",
+                                    e
+                                )
                             })
                         })
-                    }
+                    },
                     Err(_) => Box::new(|| {
                         read_password_from_tty(Some(
                             format!("Passphrase for {}: ", seckey_path.display()).as_str(),
@@ -241,7 +241,7 @@ impl Config {
                     .map_err(|e| Crypt4GHFSError::SecretKeyError(e.to_string()))?;
 
                 Ok(Some(key))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -327,7 +327,8 @@ impl Config {
                 .as_str()
                 .try_into()
                 .expect("Unable to parse RUST_LOG environment variable")
-        } else {
+        }
+        else {
             let log_level = self.get_log_level();
             let log_level_str = match log_level {
                 LogLevel::Critical => "error",
@@ -343,7 +344,8 @@ impl Config {
         // Choose logger
         if self.logger.use_syslog {
             syslog::init(self.get_facility(), log_level.into(), None)?;
-        } else {
+        }
+        else {
             let _ = pretty_env_logger::try_init(); // Ignore error
         }
 
