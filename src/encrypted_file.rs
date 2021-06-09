@@ -1,18 +1,19 @@
+use crate::egafile::EgaFile;
+use crate::error::{Crypt4GHFSError, Result};
+use crate::utils;
+use chacha20poly1305_ietf::{Key, Nonce};
+use crypt4gh::header::DecryptedHeaderPackets;
+use crypt4gh::{Keys, SEGMENT_SIZE};
+use itertools::Itertools;
+use sodiumoxide::crypto::aead::chacha20poly1305_ietf;
+use sodiumoxide::randombytes::randombytes;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
-use chacha20poly1305_ietf::{Key, Nonce};
-use crypt4gh::{Keys, SEGMENT_SIZE};
-use itertools::Itertools;
-use sodiumoxide::crypto::aead::chacha20poly1305_ietf;
-use sodiumoxide::randombytes::randombytes;
-
-use crate::egafile::EgaFile;
-use crate::error::{Crypt4GHFSError, Result};
-use crate::utils;
+const CIPHER_SEGMENT_SIZE: usize = SEGMENT_SIZE + 28;
 
 pub struct EncryptedFile {
     opened_files: HashMap<u64, Box<File>>,
@@ -22,6 +23,18 @@ pub struct EncryptedFile {
     recipient_keys: HashSet<Keys>,
     write_buffer: Vec<u8>,
     only_read: bool,
+
+    // Optimization
+    buffer: HashMap<u64, EncryptionBuffer>,
+    session_keys: Vec<Vec<u8>>,
+    header_len: u64,
+}
+
+#[derive(Debug, Default)]
+struct EncryptionBuffer {
+    data: Vec<u8>,
+    pos: usize,
+    valid: bool,
 }
 
 impl EgaFile for EncryptedFile {
@@ -34,12 +47,25 @@ impl EgaFile for EncryptedFile {
     }
 
     fn open(&mut self, flags: i32) -> Result<i32> {
+        // Get path
         let mut path_str = self.path().to_string_lossy().to_string();
         path_str.push_str(".c4gh");
         let path = Path::new(&path_str);
-        let file = utils::open(path, flags)?;
+
+        // Open file
+        let mut file = utils::open(path, flags)?;
         let fh = file.as_raw_fd();
+
+        // Buffer
+        self.buffer.insert(fh as u64, EncryptionBuffer::default());
+        let (keys, header_length) = self.read_header(&mut file).unwrap();
+        self.session_keys = keys;
+        self.header_len = u64::from(header_length);
+
+        // Add to opened files
         self.opened_files.insert(fh as u64, Box::new(file));
+
+        // Return
         Ok(fh)
     }
 
@@ -48,32 +74,63 @@ impl EgaFile for EncryptedFile {
             .opened_files
             .get_mut(&fh)
             .ok_or(Crypt4GHFSError::FileNotOpened)?;
-        f.seek(SeekFrom::Start(0))?;
-        let read_size = f.read(&mut [0_u8])?;
-        if read_size == 0 {
-            log::debug!("Read zero");
-            return Ok(Vec::new());
-        }
-        f.seek(SeekFrom::Start(0))?;
-        f.flush()?;
-        let mut decrypted_data = Vec::new();
 
-        crypt4gh::decrypt(
-            &self.keys,
-            f,
-            &mut decrypted_data,
-            offset as usize,
-            Some(size as usize),
-            &None,
-        )
-        .map_err(|e| Crypt4GHFSError::Crypt4GHError(e.to_string()))?;
-        log::debug!(
-            "Read: {} bytes (offset = {}, limit = {})",
-            decrypted_data.len(),
-            offset,
-            size
-        );
-        Ok(decrypted_data)
+        let first_segment = offset as usize / SEGMENT_SIZE;
+        let mut off = offset as usize % SEGMENT_SIZE;
+
+        let length = off + size as usize;
+        let mut nsegments = length / SEGMENT_SIZE;
+        if length % SEGMENT_SIZE != 0 {
+            nsegments += 1;
+        }
+
+        let start_pos = first_segment * SEGMENT_SIZE;
+
+        log::debug!("first_segment: {}", first_segment);
+        log::debug!("off: {}", off);
+        log::debug!("length: {}", length);
+        log::debug!("length % SEGMENT_SIZE != 0: {}", length % SEGMENT_SIZE != 0);
+        log::debug!("nsegments: {}", nsegments);
+        log::debug!("start_pos: {}", start_pos);
+
+        let buf = self.buffer.get(&fh).expect("No buffer");
+
+        if buf.valid && buf.pos <= start_pos && ((start_pos - buf.pos) + length) <= buf.data.len() {
+            log::debug!("Already have decrypted enough data");
+            off += start_pos - buf.pos;
+
+            Ok(buf.data[off..off + size as usize].into())
+        } else {
+            f.seek(SeekFrom::Start(
+                self.header_len + first_segment as u64 * CIPHER_SEGMENT_SIZE as u64,
+            ))
+            .unwrap();
+
+            let mut output = Vec::new();
+
+            for _ in 0..nsegments {
+                let mut chunk = Vec::with_capacity(CIPHER_SEGMENT_SIZE);
+                let n = f
+                    .take(CIPHER_SEGMENT_SIZE as u64)
+                    .read_to_end(&mut chunk)
+                    .unwrap();
+
+                if n == 0 {
+                    break;
+                }
+
+                let segment = Self::decrypt_block(&chunk, &self.session_keys);
+                output.extend_from_slice(&segment);
+
+                if n < CIPHER_SEGMENT_SIZE {
+                    break;
+                }
+            }
+
+            log::debug!("Output: {}", output.len());
+
+            Ok(output[off..(off + size as usize).min(output.len())].into())
+        }
     }
 
     fn flush(&mut self, fh: u64) -> Result<()> {
@@ -136,8 +193,7 @@ impl EgaFile for EncryptedFile {
             if segment_slice.len() < SEGMENT_SIZE {
                 log::info!("Storing PARTIAL segment");
                 new_last_segment = segment_slice;
-            }
-            else {
+            } else {
                 log::info!("Writing FULL segment");
                 // Full segment, write to the file
                 let f = self
@@ -221,6 +277,65 @@ impl EncryptedFile {
             recipient_keys: recipient_keys.clone(),
             write_buffer: Vec::new(),
             only_read: true,
+            buffer: HashMap::new(),
+            session_keys: Vec::new(),
+            header_len: 0,
         }
+    }
+
+    fn read_header(&self, file: &mut File) -> Result<(Vec<Vec<u8>>, u32)> {
+        // Get header info
+        let mut header_length = 16;
+        let mut temp_buf = [0_u8; 16]; // Size of the header
+        file.read_exact(&mut temp_buf)?;
+
+        let header_info = crypt4gh::header::deconstruct_header_info(&temp_buf).unwrap();
+
+        // Calculate header packets
+        let encrypted_packets = (0..header_info.packets_count)
+            .map(|_| {
+                // Get length
+                let mut length_buffer = [0_u8; 4];
+                file.read_exact(&mut length_buffer).unwrap();
+                let length = u32::from_le_bytes(length_buffer);
+                header_length += length;
+                let length = length - 4;
+                log::debug!("Packet length: {}", length);
+
+                // Get data
+                let mut encrypted_data = vec![0_u8; length as usize];
+                file.read_exact(&mut encrypted_data).unwrap();
+                Ok(encrypted_data)
+            })
+            .collect::<Result<Vec<Vec<u8>>>>()?;
+
+        let DecryptedHeaderPackets {
+            data_enc_packets: session_keys,
+            edit_list_packet: edit_list_content,
+        } = crypt4gh::header::deconstruct_header_body(encrypted_packets, &self.keys, &None)
+            .unwrap();
+
+        assert!(edit_list_content.is_none());
+
+        Ok((session_keys, header_length))
+    }
+
+    fn decrypt_block(ciphersegment: &[u8], session_keys: &[Vec<u8>]) -> Vec<u8> {
+        let (nonce_slice, data) = ciphersegment.split_at(12);
+        let nonce = chacha20poly1305_ietf::Nonce::from_slice(nonce_slice).unwrap();
+
+        log::debug!("Nonce slice: {:02x?}", nonce_slice.iter().format(""));
+        log::debug!("Data len = {}", data.len());
+        for key in session_keys {
+            log::debug!("Session keys: {:02x?}", key.iter().format(""));
+        }
+
+        session_keys
+            .iter()
+            .find_map(|key| {
+                chacha20poly1305_ietf::Key::from_slice(key)
+                    .and_then(|key| chacha20poly1305_ietf::open(data, None, &nonce, &key).ok())
+            })
+            .unwrap()
     }
 }
