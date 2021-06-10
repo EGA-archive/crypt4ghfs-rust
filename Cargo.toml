@@ -4,9 +4,12 @@ version = "0.2.0"
 authors = ["Roberto <roberto.ariosa@crg.eu>"]
 edition = "2018"
 license = "Apache-2.0"
+description = ""
 repository = "https://github.com/EGA-archive/crypt4ghfs-rust"
+documentation = "https://docs.rs/crypt4ghfs"
+keywords = ["crypt4gh", "genetics", "filesystem", "encryption", "c4gh"]
+categories = ["filesystem", "cryptography", "encoding"]
 readme = "README.md"
-# TODO: Add missing categories
 
 [lib]
 name = "crypt4ghfs"
@@ -36,3 +39,6 @@ syslog = "5.0.0"
 
 # Decrypting
 sodiumoxide = "0.2.6"
+
+[profile.release]
+lto = true
