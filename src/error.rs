@@ -23,15 +23,13 @@ pub enum Crypt4GHFSError {
     SecretKeyError(String),
     #[error("Connection url bad format")]
     BadConfigConnectionUrl,
-    #[error("AMQP TlsConnector builder failed")]
-    TlsConnectorError,
     #[error("Invalid checksum format")]
     InvalidChecksumFormat,
     #[error("No checksum found")]
     NoChecksum,
     #[error("Invalid connection_url scheme: {0}")]
     InvalidScheme(String),
-    #[error("AMQP Error")]
+    #[error("IO Error: {0}")]
     IoError(#[from] io::Error),
     #[error("CLI configuration failed (ERROR = {0})")]
     ConfigError(#[from] clap::Error),

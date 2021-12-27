@@ -73,13 +73,6 @@ pub struct Crypt4GH {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Amqp {
-    pub connection_url: String,
-    pub exchange: String,
-    pub routing_key: String,
-}
-
-#[derive(Deserialize, Debug)]
 pub struct LoggerConfig {
     pub log_level: LogLevel,
     pub use_syslog: bool,
