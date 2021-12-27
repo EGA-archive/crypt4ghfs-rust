@@ -38,7 +38,7 @@ impl FileAdmin {
     pub fn get_by_path_mut(&mut self, path: &Path) -> Option<&mut dyn EgaFile> {
         self.path2inode
             .get(path)
-            .cloned()
+            .copied()
             .map(move |ino| self.get_file_mut(ino))
     }
 

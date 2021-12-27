@@ -62,7 +62,6 @@ pub fn stat_to_fileatr(stat: FileStat, uid: u32, gid: u32) -> FileAttr {
         gid,
         rdev: stat.st_rdev as u32,
         blksize: stat.st_blksize as u32,
-        padding: 0,
         flags: 0,
     }
 }

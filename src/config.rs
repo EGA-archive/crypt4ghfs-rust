@@ -1,21 +1,21 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use crypt4gh::error::Crypt4GHError;
 use crypt4gh::Keys;
+use fuser::MountOption;
 use itertools::Itertools;
 use rpassword::read_password_from_tty;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::error::Crypt4GHFSError;
 
 const PASSPHRASE: &str = "C4GH_PASSPHRASE";
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum LogLevel {
     #[serde(alias = "CRITICAL")]
@@ -27,7 +27,7 @@ pub enum LogLevel {
     Trace,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Facility {
     Kern,
@@ -52,95 +52,41 @@ pub enum Facility {
     Local7,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum FuseMountOption {
-    FSName(String),
-    Subtype(String),
-    Custom(String),
-    AllowOther,
-    AllowRoot,
-    AutoUnmount,
-    DefaultPermissions,
-    Dev,
-    NoDev,
-    Suid,
-    NoSuid,
-    Ro,
-    Rw,
-    Exec,
-    NoExec,
-    Atime,
-    NoAtime,
-    DirSync,
-    Sync,
-    Async,
-}
-
-impl FuseMountOption {
-    // TODO: Improve this
-    pub fn to_os_string(&self) -> OsString {
-        match self {
-            Self::FSName(name) => OsString::from(&format!("-ofsname={}", name)),
-            Self::Subtype(subtype) => OsString::from(&format!("-osubtype={}", subtype)),
-            Self::Custom(value) => OsString::from(&value.clone()),
-            Self::AllowOther => OsString::from("-oallow_other"),
-            Self::AllowRoot => OsString::from("-oallow_root"),
-            Self::AutoUnmount => OsString::from("-oauto_unmount"),
-            Self::DefaultPermissions => OsString::from("-odefault_permissions"),
-            Self::Dev => OsString::from("-odev"),
-            Self::NoDev => OsString::from("-onodev"),
-            Self::Suid => OsString::from("-osuid"),
-            Self::NoSuid => OsString::from("-onosuid"),
-            Self::Ro => OsString::from("-oro"),
-            Self::Rw => OsString::from("-orw"),
-            Self::Exec => OsString::from("-oexec"),
-            Self::NoExec => OsString::from("-onoexec"),
-            Self::Atime => OsString::from("-oatime"),
-            Self::NoAtime => OsString::from("-onoatime"),
-            Self::DirSync => OsString::from("-odirsync"),
-            Self::Sync => OsString::from("-osync"),
-            Self::Async => OsString::from("-oasync"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Default {
     extensions: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Fuse {
-    options: Option<Vec<FuseMountOption>>,
+    options: Option<Vec<String>>,
     rootdir: String,
     cache_directories: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Crypt4GH {
     #[serde(rename = "seckey")]
     seckey_path: Option<String>,
     recipients: Option<Vec<String>>,
     include_myself_as_recipient: Option<bool>,
-    include_crypt4gh_log: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Amqp {
     pub connection_url: String,
     pub exchange: String,
     pub routing_key: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct LoggerConfig {
     pub log_level: LogLevel,
     pub use_syslog: bool,
     pub log_facility: Option<Facility>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Config {
     default: Default,
@@ -156,9 +102,9 @@ impl Config {
             fuse: Fuse {
                 rootdir,
                 options: Some(vec![
-                    FuseMountOption::Ro,
-                    FuseMountOption::DefaultPermissions,
-                    FuseMountOption::AutoUnmount,
+                    "ro".into(),
+                    "default_permissions".into(),
+                    "auto_unmount".into(),
                 ]),
                 cache_directories: Some(true),
             },
@@ -166,7 +112,6 @@ impl Config {
                 seckey_path,
                 recipients: Some(vec![]),
                 include_myself_as_recipient: Some(true),
-                include_crypt4gh_log: Some(true),
             },
             logger: LoggerConfig {
                 log_level: LogLevel::Info,
@@ -186,11 +131,20 @@ impl Config {
         self
     }
 
-    pub fn get_options(&self) -> Vec<FuseMountOption> {
-        if let Some(options) = &self.fuse.options {
-            return options.clone();
-        }
-        vec![FuseMountOption::Rw, FuseMountOption::DefaultPermissions]
+    pub fn get_options(&self) -> Vec<MountOption> {
+        self.fuse.options.clone().map_or_else(
+            || vec![MountOption::RW, MountOption::DefaultPermissions],
+            |options| {
+                options
+                    .iter()
+                    .map(String::as_str)
+                    .map(str_to_mount_option)
+                    .inspect(|option| {
+                        log::info!("+ fuse option: {:?}", option);
+                    })
+                    .collect()
+            },
+        )
     }
 
     pub const fn get_cache(&self) -> bool {
@@ -214,28 +168,25 @@ impl Config {
                     return Err(Crypt4GHFSError::SecretNotFound(seckey_path.into()));
                 }
 
-                let callback: Box<dyn Fn() -> Result<String>> = match std::env::var(PASSPHRASE) {
-                    Ok(_) => {
-                        log::warn!(
-                            "Warning: Using a passphrase in an environment variable is insecure"
-                        );
-                        Box::new(|| {
-                            std::env::var(PASSPHRASE).map_err(|e| {
-                                anyhow!(
-                                    "Unable to get the passphrase from the env variable \
-                                     C4GH_PASSPHRASE ({})",
-                                    e
-                                )
+                let callback: Box<dyn Fn() -> Result<String, Crypt4GHError>> =
+                    match std::env::var(PASSPHRASE) {
+                        Ok(_) => {
+                            log::warn!(
+                                "Warning: Using a passphrase in an environment variable is \
+                                 insecure"
+                            );
+                            Box::new(|| {
+                                std::env::var(PASSPHRASE)
+                                    .map_err(|e| Crypt4GHError::NoPassphrase(e.into()))
                             })
-                        })
-                    },
-                    Err(_) => Box::new(|| {
-                        read_password_from_tty(Some(
-                            format!("Passphrase for {}: ", seckey_path.display()).as_str(),
-                        ))
-                        .map_err(|e| anyhow!("Unable to read password from TTY: {}", e))
-                    }),
-                };
+                        },
+                        Err(_) => Box::new(|| {
+                            read_password_from_tty(Some(
+                                format!("Passphrase for {}: ", seckey_path.display()).as_str(),
+                            ))
+                            .map_err(|e| Crypt4GHError::NoPassphrase(e.into()))
+                        }),
+                    };
 
                 let key = crypt4gh::keys::get_private_key(seckey_path, callback)
                     .map_err(|e| Crypt4GHFSError::SecretKeyError(e.to_string()))?;
@@ -377,5 +328,30 @@ impl From<LogLevel> for log::LevelFilter {
             LogLevel::Debug => Self::Debug,
             LogLevel::Trace => Self::Trace,
         }
+    }
+}
+
+fn str_to_mount_option(s: &str) -> MountOption {
+    match s {
+        "auto_unmount" => MountOption::AutoUnmount,
+        "allow_other" => MountOption::AllowOther,
+        "allow_root" => MountOption::AllowRoot,
+        "default_permissions" => MountOption::DefaultPermissions,
+        "dev" => MountOption::Dev,
+        "nodev" => MountOption::NoDev,
+        "suid" => MountOption::Suid,
+        "nosuid" => MountOption::NoSuid,
+        "ro" => MountOption::RO,
+        "rw" => MountOption::RW,
+        "exec" => MountOption::Exec,
+        "noexec" => MountOption::NoExec,
+        "atime" => MountOption::Atime,
+        "noatime" => MountOption::NoAtime,
+        "dirsync" => MountOption::DirSync,
+        "sync" => MountOption::Sync,
+        "async" => MountOption::Async,
+        x if x.starts_with("fsname=") => MountOption::FSName(x[7..].into()),
+        x if x.starts_with("subtype=") => MountOption::Subtype(x[8..].into()),
+        x => MountOption::CUSTOM(x.into()),
     }
 }

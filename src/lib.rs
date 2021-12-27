@@ -9,7 +9,6 @@
     clippy::similar_names
 )]
 
-use std::ffi::OsStr;
 use std::path::Path;
 
 use config::Config;
@@ -37,24 +36,18 @@ pub fn run_with_config(conf: &Config, mountpoint: &str) -> Result<(), Crypt4GHFS
     }
 
     // Encryption / Decryption keys
-    let seckey = if let Some(key) = conf.get_secret_key()? {
-        key
-    }
-    else {
-        log::warn!("No seckey specified");
-        vec![0_u8; 32]
-    };
+    let seckey = (conf.get_secret_key()?).map_or_else(
+        || {
+            log::warn!("No seckey specified");
+            vec![0_u8; 32]
+        },
+        |key| key,
+    );
 
     let recipients = conf.get_recipients(&seckey);
 
     // Get options
-    let options = conf
-        .get_options()
-        .iter()
-        .map(config::FuseMountOption::to_os_string)
-        .collect::<Vec<_>>();
-
-    let options = options.iter().map(|os| OsStr::new(os)).collect::<Vec<_>>();
+    let options = conf.get_options();
 
     let mountpoint = mountpoint;
 
@@ -72,5 +65,5 @@ pub fn run_with_config(conf: &Config, mountpoint: &str) -> Result<(), Crypt4GHFS
         ));
     }
 
-    fuser::mount(fs, &mountpoint, &options).map_err(|e| Crypt4GHFSError::MountError(e.to_string()))
+    fuser::mount2(fs, &mountpoint, &options).map_err(|e| Crypt4GHFSError::MountError(e.to_string()))
 }

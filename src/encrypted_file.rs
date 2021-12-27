@@ -1,17 +1,19 @@
-use crate::egafile::EgaFile;
-use crate::error::{Crypt4GHFSError, Result};
-use crate::utils;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::io::AsRawFd;
+use std::path::Path;
+
 use chacha20poly1305_ietf::{Key, Nonce};
 use crypt4gh::header::DecryptedHeaderPackets;
 use crypt4gh::{Keys, SEGMENT_SIZE};
 use itertools::Itertools;
 use sodiumoxide::crypto::aead::chacha20poly1305_ietf;
 use sodiumoxide::randombytes::randombytes;
-use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::os::unix::io::AsRawFd;
-use std::path::Path;
+
+use crate::egafile::EgaFile;
+use crate::error::{Crypt4GHFSError, Result};
+use crate::utils;
 
 const CIPHER_SEGMENT_SIZE: usize = SEGMENT_SIZE + 28;
 
@@ -100,7 +102,8 @@ impl EgaFile for EncryptedFile {
             off += start_pos - buf.pos;
 
             Ok(buf.data[off..off + size as usize].into())
-        } else {
+        }
+        else {
             f.seek(SeekFrom::Start(
                 self.header_len + first_segment as u64 * CIPHER_SEGMENT_SIZE as u64,
             ))
@@ -146,7 +149,7 @@ impl EgaFile for EncryptedFile {
                 Key::from_slice(&self.session_key).expect("Unable to create key from session_key");
             let encrypted_segment = crypt4gh::encrypt_segment(&self.write_buffer, nonce, &key);
             f.write_all(&encrypted_segment)?;
-            self.write_buffer.clear()
+            self.write_buffer.clear();
         }
         f.flush()?;
         Ok(())
@@ -193,7 +196,8 @@ impl EgaFile for EncryptedFile {
             if segment_slice.len() < SEGMENT_SIZE {
                 log::info!("Storing PARTIAL segment");
                 new_last_segment = segment_slice;
-            } else {
+            }
+            else {
                 log::info!("Writing FULL segment");
                 // Full segment, write to the file
                 let f = self

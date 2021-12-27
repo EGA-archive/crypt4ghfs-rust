@@ -1,7 +1,7 @@
 use std::env;
 use std::fs::File;
 
-use clap::{crate_authors, crate_version, load_yaml, App, AppSettings};
+use clap::{crate_authors, crate_version, load_yaml, value_t, App, AppSettings};
 use crypt4ghfs::error::Crypt4GHFSError;
 use crypt4ghfs::{config, run_with_config};
 
@@ -16,10 +16,10 @@ fn run() -> Result<(), Crypt4GHFSError> {
         .global_setting(AppSettings::ColoredHelp)
         .get_matches();
 
-    let mountpoint: String = matches.value_of_t("MOUNTPOINT")?;
+    let mountpoint = value_t!(matches, "MOUNTPOINT", String)?;
 
     // Read config
-    let config_path: String = matches.value_of_t("conf")?;
+    let config_path = value_t!(matches, "conf", String)?;
     log::info!("Loading config: {}", config_path);
     let config_file = File::open(config_path)?;
 

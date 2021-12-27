@@ -1,16 +1,16 @@
 name: crypt4ghfs
-about: Fuse layer exposing Crypt4GH-encrypted files, as if they were decrypted.
+help: Fuse layer exposing Crypt4GH-encrypted files, as if they were decrypted.
 args:
     - verbose:
         required: false
         short: v
         long: verbose
-        about: Sets the level of verbosity
+        help: Sets the level of verbosity
         takes_value: false
     - conf:
         required: true
         long: conf
-        #about: TODO
+        #help: TODO
         takes_value: true
         value_name: conf_path
     - MOUNTPOINT:

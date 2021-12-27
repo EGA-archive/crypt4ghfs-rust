@@ -56,7 +56,7 @@ impl Crypt4ghFS {
 impl Filesystem for Crypt4ghFS {
     // FILESYSTEM
 
-    fn destroy(&mut self, _req: &Request<'_>) {
+    fn destroy(&mut self) {
         log::info!("1 - Elapsed: {:?}", self.duration1);
     }
 
@@ -112,7 +112,7 @@ impl Filesystem for Crypt4ghFS {
 
         if let Some(size) = size {
             if let Err(e) = file.truncate(fh, size) {
-                err = Some(e)
+                err = Some(e);
             }
         }
 
@@ -186,7 +186,7 @@ impl Filesystem for Crypt4ghFS {
             Ok(data) => reply.data(&data),
             Err(e) => {
                 log::error!("{:?}", e);
-                reply.error(e.to_raw_os_error())
+                reply.error(e.to_raw_os_error());
             },
         }
     }
@@ -245,7 +245,7 @@ impl Filesystem for Crypt4ghFS {
 
         // Add and reply
         self.file_admin.add(ino, egafile);
-        reply.created(&TTL, &attrs, 0, fh, flags as u32)
+        reply.created(&TTL, &attrs, 0, fh, flags as u32);
     }
 
     fn write(
@@ -282,7 +282,7 @@ impl Filesystem for Crypt4ghFS {
 
         file.close(fh).unwrap();
 
-        reply.ok()
+        reply.ok();
     }
 
     fn rename(
@@ -454,7 +454,7 @@ impl Filesystem for Crypt4ghFS {
             Ok(_) => {
                 let stat = utils::lstat(&path).unwrap();
                 let attrs = utils::stat_to_fileatr(stat, req.uid(), req.gid());
-                reply.entry(&TTL, &attrs, 0)
+                reply.entry(&TTL, &attrs, 0);
             },
             Err(e) => reply.error(e.raw_os_error().expect("Unable to retrieve raw OS error")),
         }
