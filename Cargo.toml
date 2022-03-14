@@ -2,7 +2,7 @@
 name = "crypt4ghfs"
 version = "0.3.0"
 authors = ["Roberto <roberto.ariosa@crg.eu>"]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "Fuse layer exposing Crypt4GH-encrypted files, as if they were decrypted"
 repository = "https://github.com/EGA-archive/crypt4ghfs-rust"
